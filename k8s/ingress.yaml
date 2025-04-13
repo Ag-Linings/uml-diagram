@@ -17,10 +17,3 @@ spec:
             name: uml-diagram-generator
             port:
               number: 80
-      - path: /uml/history
-        pathType: Prefix
-        backend:
-          service:
-            name: uml-diagram-generator
-            port:
-              number: 80

@@ -6,14 +6,8 @@ import {
   Method,
   Relationship, 
   GenerateUMLRequest,
-  GenerateUMLResponse,
-  SaveUMLRequest,
-  SaveUMLResponse,
-  UMLDiagram
+  GenerateUMLResponse 
 } from './api';
-
-// Local storage key for UML history
-const UML_HISTORY_KEY = 'uml_diagram_history';
 
 // Mock response for processSpecs endpoint
 export const mockProcessSpecsResponse = (description: string): ProcessSpecsResponse => {
@@ -314,52 +308,4 @@ export const mockGenerateUMLResponse = (request: GenerateUMLRequest): GenerateUM
   return {
     umlSyntax: mermaidSyntax
   };
-};
-
-// Mock UML History storage using localStorage
-const getHistoryFromStorage = (): UMLDiagram[] => {
-  try {
-    const historyStr = localStorage.getItem(UML_HISTORY_KEY);
-    return historyStr ? JSON.parse(historyStr) : [];
-  } catch (e) {
-    console.error('Error loading UML history from localStorage:', e);
-    return [];
-  }
-};
-
-const saveHistoryToStorage = (diagrams: UMLDiagram[]): void => {
-  try {
-    localStorage.setItem(UML_HISTORY_KEY, JSON.stringify(diagrams));
-  } catch (e) {
-    console.error('Error saving UML history to localStorage:', e);
-  }
-};
-
-// Mock save UML diagram endpoint
-export const mockSaveUMLDiagram = (request: SaveUMLRequest): SaveUMLResponse => {
-  const history = getHistoryFromStorage();
-  
-  const newDiagram: UMLDiagram = {
-    id: Date.now().toString(),
-    title: request.title || `UML Diagram ${history.length + 1}`,
-    description: request.description,
-    umlSyntax: request.umlSyntax,
-    entities: request.entities,
-    relationships: request.relationships,
-    createdAt: new Date().toISOString()
-  };
-  
-  history.push(newDiagram);
-  saveHistoryToStorage(history);
-  
-  return {
-    id: newDiagram.id,
-    success: true
-  };
-};
-
-// Mock get UML history endpoint
-export const mockGetUMLHistory = (): UMLDiagram[] => {
-  const history = getHistoryFromStorage();
-  return history.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 };

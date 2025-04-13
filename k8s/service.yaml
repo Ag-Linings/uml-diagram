@@ -7,30 +7,6 @@ spec:
   selector:
     app: uml-diagram-generator
   ports:
-  - name: frontend
-    port: 80
+  - port: 80
     targetPort: 80
   type: ClusterIP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-spec:
-  selector:
-    app: uml-diagram-generator
-  ports:
-  - port: 8000
-    targetPort: 8000
-  type: ClusterIP
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: uml-generator-data
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi

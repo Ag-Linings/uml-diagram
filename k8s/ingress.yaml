@@ -1,0 +1,19 @@
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: uml-diagram-generator-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /uml
+        pathType: Prefix
+        backend:
+          service:
+            name: uml-diagram-generator
+            port:
+              number: 80

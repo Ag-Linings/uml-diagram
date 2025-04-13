@@ -1,15 +1,18 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { processSpecs, generateUML, ProcessSpecsResponse, Entity, Relationship } from '../services/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { processSpecs, generateUML, saveUMLDiagram, ProcessSpecsResponse, Entity, Relationship, UMLDiagram } from '../services/api';
 import { toast } from 'sonner';
 import MermaidRenderer from './MermaidRenderer';
 import EntityList from './EntityList';
 import { examples } from '../utils/examples';
-import { Lightbulb, RefreshCcw } from 'lucide-react';
+import { Lightbulb, RefreshCcw, Save, History } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const UMLGenerator: React.FC = () => {
   const [description, setDescription] = useState('');
@@ -18,6 +21,33 @@ const UMLGenerator: React.FC = () => {
   const [processedSpecs, setProcessedSpecs] = useState<ProcessSpecsResponse | null>(null);
   const [umlSyntax, setUmlSyntax] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('specifications');
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [diagramTitle, setDiagramTitle] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if there's a selected diagram from history
+    const selectedDiagramStr = sessionStorage.getItem('selectedDiagram');
+    if (selectedDiagramStr) {
+      try {
+        const diagram: UMLDiagram = JSON.parse(selectedDiagramStr);
+        setDescription(diagram.description);
+        setProcessedSpecs({
+          enhancedDescription: diagram.description,
+          entities: diagram.entities,
+          relationships: diagram.relationships
+        });
+        setUmlSyntax(diagram.umlSyntax);
+        setDiagramTitle(diagram.title);
+        setActiveTab('diagram');
+        // Clear from session storage to avoid reloading on page refresh
+        sessionStorage.removeItem('selectedDiagram');
+        toast.success(`Loaded diagram: ${diagram.title}`);
+      } catch (error) {
+        console.error('Error loading diagram from history:', error);
+      }
+    }
+  }, []);
 
   const handleExampleClick = (exampleDescription: string) => {
     setDescription(exampleDescription);
@@ -53,6 +83,35 @@ const UMLGenerator: React.FC = () => {
     } finally {
       setLoading(false);
       setProcessingStep('idle');
+    }
+  };
+
+  const handleSaveDiagram = async () => {
+    if (!processedSpecs || !umlSyntax) {
+      toast.error('No UML diagram to save');
+      return;
+    }
+
+    try {
+      const title = diagramTitle || `UML Diagram ${new Date().toLocaleString()}`;
+      
+      const saveResponse = await saveUMLDiagram({
+        title,
+        description: description,
+        umlSyntax,
+        entities: processedSpecs.entities,
+        relationships: processedSpecs.relationships
+      });
+      
+      if (saveResponse.success) {
+        toast.success('Diagram saved successfully');
+        setSaveDialogOpen(false);
+      } else {
+        toast.error('Failed to save diagram');
+      }
+    } catch (error) {
+      console.error('Error saving diagram:', error);
+      toast.error('Failed to save diagram');
     }
   };
 
@@ -107,7 +166,15 @@ const UMLGenerator: React.FC = () => {
             ))}
           </div>
           
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/history')}
+              className="flex items-center gap-2"
+            >
+              <History className="h-4 w-4" />
+              View History
+            </Button>
             <Button 
               onClick={handleSubmit} 
               disabled={loading || !description.trim()} 
@@ -145,7 +212,46 @@ const UMLGenerator: React.FC = () => {
             
             <TabsContent value="diagram">
               <Card className="p-6">
-                <h3 className="text-xl font-semibold mb-4">UML Class Diagram</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold">UML Class Diagram</h3>
+                  
+                  <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline"
+                        className="flex items-center gap-2"
+                        disabled={!umlSyntax}
+                      >
+                        <Save className="h-4 w-4" />
+                        Save Diagram
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Save UML Diagram</DialogTitle>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <label className="text-sm font-medium block mb-2">
+                          Diagram Title
+                        </label>
+                        <Input 
+                          value={diagramTitle} 
+                          onChange={(e) => setDiagramTitle(e.target.value)} 
+                          placeholder="Enter a title for your diagram"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveDiagram}>
+                          Save
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                
                 {umlSyntax ? (
                   <MermaidRenderer chart={umlSyntax} />
                 ) : (

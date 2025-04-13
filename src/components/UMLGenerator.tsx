@@ -108,13 +108,14 @@ const UMLGenerator: React.FC = () => {
           </div>
           
           <div className="flex justify-end">
-            <Button 
-              onClick={handleSubmit} 
-              disabled={loading || !description.trim()} 
-              className="bg-uml-primary hover:bg-blue-900"
-            >
-              Generate UML Diagram
-            </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={loading || !description.trim()} 
+            style={{ backgroundColor: '#a89467' }}
+            className="text-white hover:opacity-90"
+          >
+            Generate UML Diagram
+          </Button>
           </div>
         </div>
       </Card>

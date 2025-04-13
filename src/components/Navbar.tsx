@@ -4,7 +4,7 @@ import { Activity } from "lucide-react";
 
 const Navbar: React.FC = () => {
   return (
-    <nav className="bg-uml-primary text-white p-4 shadow-md">
+    <nav className="bg-[#a98467] text-white p-4 shadow-md">
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Activity className="h-6 w-6" />

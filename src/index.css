@@ -100,98 +100,102 @@
   }
 } */
 
-
-@tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+@tailwind base;
 @layer base {
   :root {
-    --background: 0 0% 0%; /* Black background */
-    --foreground: 330 100% 60%; /* Hot pink foreground */
-    
-    --card: 0 0% 0%; /* Black card background */
-    --card-foreground: 330 100% 60%; /* Hot pink text */
-    
-    --popover: 0 0% 0%; /* Black popover background */
-    --popover-foreground: 330 100% 60%; /* Hot pink popover text */
-    
-    --primary: 330 100% 60%; /* Hot pink primary */
-    --primary-foreground: 0 0% 100%; /* White primary foreground */
-    
-    --secondary: 330 100% 60%; /* Hot pink secondary */
-    --secondary-foreground: 0 0% 100%; /* White secondary foreground */
-    
-    --muted: 330 100% 60%; /* Hot pink muted */
-    --muted-foreground: 0 0% 100%; /* White muted foreground */
-    
-    --accent: 330 100% 60%; /* Hot pink accent */
-    --accent-foreground: 0 0% 100%; /* White accent foreground */
-    
-    --destructive: 0 100% 50%; /* Red destructive color */
-    --destructive-foreground: 0 0% 100%; /* White destructive foreground */
-    
-    --border: 330 100% 60%; /* Hot pink border */
-    --input: 330 100% 60%; /* Hot pink input field */
-    --ring: 330 100% 50%; /* Hot pink ring */
-    
-    --radius: 0.5rem;
+    --background: 49 55% 91%;              /* #f0ead2 */
+    --foreground: 30 10% 25%;              /* #6c584c */
 
-    --sidebar-background: 0 0% 0%; /* Black sidebar background */
-    --sidebar-foreground: 330 100% 60%; /* Hot pink sidebar foreground */
-    
-    --sidebar-primary: 330 100% 60%; /* Hot pink sidebar primary */
-    --sidebar-primary-foreground: 0 0% 100%; /* White sidebar primary foreground */
-    
-    --sidebar-accent: 330 100% 60%; /* Hot pink sidebar accent */
-    --sidebar-accent-foreground: 0 0% 100%; /* White sidebar accent foreground */
-    
-    --sidebar-border: 330 100% 60%; /* Hot pink sidebar border */
-    --sidebar-ring: 330 100% 50%; /* Hot pink sidebar ring */
+    --card: 65 38% 85%;                    /* #dde5b6 */
+    --card-foreground: 30 10% 25%;
+
+    --popover: 65 38% 85%;
+    --popover-foreground: 30 10% 25%;
+
+    --primary: 82 35% 60%;                 /* #adc178 */
+    --primary-foreground: 30 10% 25%;
+
+    --secondary: 30 25% 55%;               /* #a98467 */
+    --secondary-foreground: 49 55% 91%;
+
+    --muted: 30 25% 55%;                   /* #a98467 */
+    --muted-foreground: 30 10% 25%;
+
+    --accent: 30 10% 25%;                  /* #6c584c */
+    --accent-foreground: 49 55% 91%;
+
+    --destructive: 0 30% 45%;              /* Muted earthy red */
+    --destructive-foreground: 49 55% 95%;
+
+    --border: 82 35% 70%;                  /* Soft green border */
+    --input: 82 35% 70%;
+    --ring: 82 35% 60%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 49 55% 91%;
+    --sidebar-foreground: 30 10% 25%;
+
+    --sidebar-primary: 82 35% 60%;
+    --sidebar-primary-foreground: 30 10% 25%;
+
+    --sidebar-accent: 30 25% 55%;
+    --sidebar-accent-foreground: 49 55% 91%;
+
+    --sidebar-border: 82 35% 70%;
+    --sidebar-ring: 82 35% 60%;
   }
 
   .dark {
-    --background: 0 0% 0%; /* Black background for dark mode */
-    --foreground: 330 100% 60%; /* Hot pink foreground for dark mode */
+    --background: 30 10% 12%;
+    --foreground: 49 55% 91%;
 
-    --card: 0 0% 0%; /* Black card background in dark mode */
-    --card-foreground: 330 100% 60%; /* Hot pink card foreground in dark mode */
-    
-    --popover: 0 0% 0%; /* Black popover in dark mode */
-    --popover-foreground: 330 100% 60%; /* Hot pink popover text in dark mode */
-    
-    --primary: 330 100% 60%; /* Hot pink primary for dark mode */
-    --primary-foreground: 0 0% 100%; /* White primary foreground in dark mode */
-    
-    --secondary: 330 100% 60%; /* Hot pink secondary in dark mode */
-    --secondary-foreground: 0 0% 100%; /* White secondary foreground in dark mode */
-    
-    --muted: 330 100% 60%; /* Hot pink muted in dark mode */
-    --muted-foreground: 0 0% 100%; /* White muted foreground in dark mode */
-    
-    --accent: 330 100% 60%; /* Hot pink accent in dark mode */
-    --accent-foreground: 0 0% 100%; /* White accent foreground in dark mode */
-    
-    --destructive: 0 100% 50%; /* Red destructive color in dark mode */
-    --destructive-foreground: 0 0% 100%; /* White destructive foreground in dark mode */
-    
-    --border: 330 100% 60%; /* Hot pink border in dark mode */
-    --input: 330 100% 60%; /* Hot pink input in dark mode */
-    --ring: 330 100% 50%; /* Hot pink ring in dark mode */
-    
-    --sidebar-background: 0 0% 0%; /* Black sidebar background in dark mode */
-    --sidebar-foreground: 330 100% 60%; /* Hot pink sidebar foreground in dark mode */
-    
-    --sidebar-primary: 330 100% 60%; /* Hot pink sidebar primary in dark mode */
-    --sidebar-primary-foreground: 0 0% 100%; /* White sidebar primary foreground in dark mode */
-    
-    --sidebar-accent: 330 100% 60%; /* Hot pink sidebar accent in dark mode */
-    --sidebar-accent-foreground: 0 0% 100%; /* White sidebar accent foreground in dark mode */
-    
-    --sidebar-border: 330 100% 60%; /* Hot pink sidebar border in dark mode */
-    --sidebar-ring: 330 100% 50%; /* Hot pink sidebar ring in dark mode */
+    --card: 30 10% 18%;
+    --card-foreground: 49 55% 91%;
+
+    --popover: 30 10% 18%;
+    --popover-foreground: 49 55% 91%;
+
+    --primary: 82 35% 45%;
+    --primary-foreground: 49 55% 91%;
+
+    --secondary: 30 15% 35%;
+    --secondary-foreground: 49 55% 91%;
+
+    --muted: 30 15% 35%;
+    --muted-foreground: 65 30% 75%;
+
+    --accent: 30 10% 25%;
+    --accent-foreground: 49 55% 91%;
+
+    --destructive: 0 30% 35%;
+    --destructive-foreground: 49 55% 91%;
+
+    --border: 30 10% 25%;
+    --input: 30 10% 25%;
+    --ring: 82 35% 50%;
+
+    --sidebar-background: 30 10% 12%;
+    --sidebar-foreground: 49 55% 91%;
+    --sidebar-primary: 82 35% 45%;
+    --sidebar-primary-foreground: 49 55% 91%;
+    --sidebar-accent: 30 10% 25%;
+    --sidebar-accent-foreground: 49 55% 91%;
+    --sidebar-border: 30 10% 25%;
+    --sidebar-ring: 82 35% 50%;
   }
 }
+
+.navbar, .header, .top-bar {
+  background-color: #a98467; /* Or whatever the current dark blue is */
+}
+
+button, .btn, .generate-btn {
+  background-color: #a98467;
+}
+
 
 @layer base {
   * {
@@ -200,5 +204,6 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Georgia', serif;
   }
 }

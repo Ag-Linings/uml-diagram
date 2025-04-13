@@ -39,28 +39,41 @@
 
 .read-the-docs {
   color: #888;
-}
- */
-
+} */
 
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
-  background-color: #000000; /* Black background */
+  background-color: #f0ead2; /* Light Cream */
+  font-family: 'Georgia', serif;
+  color: #6c584c; /* Earthy Brown text */
 }
+
+.navbar, .header, .top-bar {
+  background-color: #a98467; /* Or whatever the current dark blue is */
+}
+
+button, .btn, .generate-btn {
+  background-color: #a98467;
+}
+
 
 .logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
   transition: filter 300ms;
-  filter: drop-shadow(0 0 2em #ff69b4); /* Hot pink glow effect */
+  filter: drop-shadow(0 0 1em #adc178); /* Fresh Green glow */
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #adc178); /* Brighter Fresh Green hover */
 }
 
 .logo.react:hover {
-  filter: drop-shadow(0 0 2em #ff1493); /* Bright hot pink glow */
+  filter: drop-shadow(0 0 2em #dde5b6); /* Sagey Light Green glow */
 }
 
 @keyframes logo-spin {
@@ -80,10 +93,13 @@
 
 .card {
   padding: 2em;
-  background-color: #000000; /* Black card background */
-  border: 2px solid #ff69b4; /* Hot pink border */
+  background-color: #dde5b6; /* Sagey Light Green */
+  border: 2px solid #adc178; /* Fresh Green border */
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(173, 193, 120, 0.3); /* Soft Fresh Green shadow */
 }
 
 .read-the-docs {
-  color: #ff69b4; /* Hot pink text */
+  color: #a98467; /* Muted Mocha text */
+  font-style: italic;
 }

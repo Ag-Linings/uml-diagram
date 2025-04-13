@@ -16,8 +16,8 @@ spec:
         app: uml-diagram-generator
     spec:
       containers:
-      - name: uml-diagram-generator
-        image: ${DOCKER_REGISTRY}/uml-diagram-generator:latest
+      - name: frontend
+        image: ${DOCKER_REGISTRY}/uml-diagram-generator-frontend:latest
         ports:
         - containerPort: 80
         resources:
@@ -39,3 +39,36 @@ spec:
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 5
+        volumeMounts:
+          - mountPath: /data
+            name: uml-data
+      - name: backend
+        image: ${DOCKER_REGISTRY}/uml-diagram-generator-backend:latest
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: "512Mi"
+          requests:
+            cpu: "0.2"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+          - mountPath: /data
+            name: uml-data
+      volumes:
+        - name: uml-data
+          persistentVolumeClaim:
+            claimName: uml-generator-data

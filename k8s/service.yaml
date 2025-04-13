@@ -7,8 +7,21 @@ spec:
   selector:
     app: uml-diagram-generator
   ports:
-  - port: 80
+  - name: frontend
+    port: 80
     targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: uml-diagram-generator
+  ports:
+  - port: 8000
+    targetPort: 8000
   type: ClusterIP
 ---
 apiVersion: v1

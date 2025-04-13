@@ -1,0 +1,22 @@
+
+version: '3'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    volumes:
+      - uml-data:/data
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - uml-data:/data
+
+volumes:
+  uml-data:

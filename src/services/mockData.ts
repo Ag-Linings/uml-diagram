@@ -2,6 +2,8 @@
 import { 
   ProcessSpecsResponse, 
   Entity, 
+  Attribute,
+  Method,
   Relationship, 
   GenerateUMLRequest,
   GenerateUMLResponse 
@@ -10,102 +12,239 @@ import {
 // Mock response for processSpecs endpoint
 export const mockProcessSpecsResponse = (description: string): ProcessSpecsResponse => {
   // This is a simplified example that extracts potential class names from the input
-  // In a real implementation, this would be done by an LLM
   
-  // Basic extraction logic - capitalize words that could be class names
-  const potentialClassNames = description
+  // Extract potential class names - look for capitalized words
+  let potentialClassNames = description
     .split(/[.,;:\s]/)
     .filter(word => word.length > 3)
-    .filter(word => word[0].toUpperCase() === word[0])
-    .filter((v, i, a) => a.indexOf(v) === i) // Remove duplicates
-    .slice(0, 5); // Limit to 5 classes for demo
+    .filter(word => word[0] === word[0].toUpperCase())
+    .filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
   
-  if (potentialClassNames.length === 0) {
-    potentialClassNames.push('User', 'System');
+  // If no suitable class names found, try to extract nouns
+  if (potentialClassNames.length < 2) {
+    const commonWords = ['the', 'and', 'a', 'an', 'with', 'for', 'to', 'in', 'on', 'at', 'by', 'of'];
+    potentialClassNames = description
+      .split(/[.,;:\s]/)
+      .filter(word => word.length > 3)
+      .filter(word => !commonWords.includes(word.toLowerCase()))
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize first letter
+      .filter((v, i, a) => a.indexOf(v) === i) // Remove duplicates
+      .slice(0, 6); // Limit to 6 classes
   }
   
-  // Create mock entities
-  const entities: Entity[] = potentialClassNames.map(name => ({
-    name,
-    attributes: [
+  // If still no suitable classes, use fallback default classes based on domain detection
+  if (potentialClassNames.length < 2) {
+    const domainKeywords = {
+      'shop': ['Product', 'Customer', 'Order', 'ShoppingCart'],
+      'education': ['Student', 'Course', 'Professor', 'Assignment'],
+      'hospital': ['Patient', 'Doctor', 'Appointment', 'Treatment'],
+      'bank': ['Account', 'Customer', 'Transaction', 'Loan'],
+      'library': ['Book', 'Member', 'Librarian', 'Borrowing'],
+      'flight': ['Flight', 'Passenger', 'Booking', 'Ticket']
+    };
+    
+    // Detect domain from description
+    const domain = Object.keys(domainKeywords).find(key => 
+      description.toLowerCase().includes(key)
+    ) || 'general';
+    
+    if (domain !== 'general') {
+      potentialClassNames = domainKeywords[domain as keyof typeof domainKeywords];
+    } else {
+      potentialClassNames = ['User', 'System', 'Data', 'Manager'];
+    }
+  }
+  
+  // Generate appropriate attributes and methods based on the description
+  const entities: Entity[] = potentialClassNames.map(name => {
+    // Generate attributes based on class name
+    const attributes: Attribute[] = [
       {
         name: 'id',
         type: 'string',
         visibility: 'private'
       },
       {
-        name: 'name',
+        name: name.toLowerCase() + 'Name',
         type: 'string',
         visibility: 'private'
-      },
-      {
+      }
+    ];
+    
+    // Add some domain-specific attributes
+    if (description.toLowerCase().includes('date') || description.toLowerCase().includes('time')) {
+      attributes.push({
         name: 'createdAt',
         type: 'Date',
         visibility: 'private'
-      }
-    ],
-    methods: [
+      });
+    }
+    
+    if (description.toLowerCase().includes('price') || description.toLowerCase().includes('cost')) {
+      attributes.push({
+        name: 'price',
+        type: 'number',
+        visibility: 'private'
+      });
+    }
+    
+    if (description.toLowerCase().includes('status') || description.toLowerCase().includes('state')) {
+      attributes.push({
+        name: 'status',
+        type: 'string',
+        visibility: 'private'
+      });
+    }
+    
+    // Generate methods
+    const methods: Method[] = [
       {
-        name: 'getId',
-        returnType: 'string',
+        name: 'get' + name,
+        returnType: name,
         parameters: [],
         visibility: 'public'
-      },
-      {
-        name: 'setName',
-        returnType: 'void',
-        parameters: [{ name: 'name', type: 'string' }],
-        visibility: 'public'
-      },
-      {
-        name: 'process',
-        returnType: 'boolean',
-        parameters: [{ name: 'data', type: 'any' }],
-        visibility: 'public'
       }
-    ]
-  }));
+    ];
+    
+    // Add crud methods based on context
+    if (description.toLowerCase().includes('update') || description.toLowerCase().includes('edit')) {
+      methods.push({
+        name: 'update' + name,
+        returnType: 'boolean',
+        parameters: [{ name: 'data', type: name }],
+        visibility: 'public'
+      });
+    }
+    
+    if (description.toLowerCase().includes('delete') || description.toLowerCase().includes('remove')) {
+      methods.push({
+        name: 'delete' + name,
+        returnType: 'void',
+        parameters: [{ name: 'id', type: 'string' }],
+        visibility: 'public'
+      });
+    }
+    
+    if (description.toLowerCase().includes('validate') || description.toLowerCase().includes('check')) {
+      methods.push({
+        name: 'validate',
+        returnType: 'boolean',
+        parameters: [],
+        visibility: 'public'
+      });
+    }
+    
+    return {
+      name,
+      attributes,
+      methods
+    };
+  });
   
-  // Create mock relationships
+  // Create relationships based on the description
   const relationships: Relationship[] = [];
   
+  // Process words that might indicate relationships
+  const hasAssociation = description.toLowerCase().includes('has') || 
+                        description.toLowerCase().includes('with') ||
+                        description.toLowerCase().includes('contains');
+                        
+  const hasInheritance = description.toLowerCase().includes('inherits') || 
+                        description.toLowerCase().includes('extends') ||
+                        description.toLowerCase().includes('type of');
+                        
+  const hasDependency = description.toLowerCase().includes('uses') ||
+                        description.toLowerCase().includes('depends') ||
+                        description.toLowerCase().includes('requires');
+  
+  const hasAggregation = description.toLowerCase().includes('consists') ||
+                        description.toLowerCase().includes('comprises') ||
+                        description.toLowerCase().includes('composed');
+  
+  // Create relationships between entities
   if (entities.length >= 2) {
+    // Add at least one relationship between first and second entity
     relationships.push({
       source: entities[0].name,
       target: entities[1].name,
-      type: 'association'
+      type: hasAssociation ? 'association' : hasDependency ? 'dependency' : 'association'
     });
+    
+    // Add additional relationships if more entities exist
+    if (entities.length >= 3) {
+      relationships.push({
+        source: entities[0].name,
+        target: entities[2].name,
+        type: hasAggregation ? 'aggregation' : 'dependency',
+        label: hasAggregation ? 'contains' : 'uses'
+      });
+    }
+    
+    if (entities.length >= 4 && hasInheritance) {
+      relationships.push({
+        source: entities[3].name,
+        target: entities[1].name,
+        type: 'inheritance'
+      });
+    } else if (entities.length >= 4) {
+      relationships.push({
+        source: entities[2].name,
+        target: entities[3].name,
+        type: 'association',
+        label: 'relates to'
+      });
+    }
+    
+    // Add one more relationship if enough entities
+    if (entities.length >= 5) {
+      relationships.push({
+        source: entities[4].name,
+        target: entities[0].name,
+        type: 'composition',
+        label: 'part of'
+      });
+    }
   }
   
-  if (entities.length >= 3) {
-    relationships.push({
-      source: entities[0].name,
-      target: entities[2].name,
-      type: 'dependency'
-    });
-  }
-  
-  if (entities.length >= 4) {
-    relationships.push({
-      source: entities[3].name,
-      target: entities[1].name,
-      type: 'inheritance'
-    });
-  }
-  
-  // Enhanced description would come from LLM in real implementation
-  const enhancedDescription = `
+  // Create enhanced description based on the extracted entities and relationships
+  let enhancedDescription = `
 System Description:
 
 This system comprises ${entities.length} main entities: ${entities.map(e => e.name).join(', ')}.
 
-Each entity has standard identification attributes and basic CRUD operations.
-${entities.length >= 2 ? `\n${entities[0].name} has a direct association with ${entities[1].name}.` : ''}
-${entities.length >= 3 ? `\n${entities[0].name} depends on ${entities[2].name} for certain operations.` : ''}
-${entities.length >= 4 ? `\n${entities[3].name} inherits properties and behaviors from ${entities[1].name}.` : ''}
-
-This is a simplified representation based on the input description. A more detailed analysis would be provided by the LLM in a production environment.
-  `;
+`;
+  
+  // Add entity descriptions
+  entities.forEach(entity => {
+    enhancedDescription += `${entity.name}: Contains ${entity.attributes.length} attributes and ${entity.methods.length} methods for data management.\n`;
+  });
+  
+  enhancedDescription += '\nRelationships:\n';
+  
+  // Add relationship descriptions
+  relationships.forEach(rel => {
+    let relationshipText = '';
+    switch (rel.type) {
+      case 'association':
+        relationshipText = `${rel.source} is associated with ${rel.target}`;
+        break;
+      case 'inheritance':
+        relationshipText = `${rel.source} inherits from ${rel.target}`;
+        break;
+      case 'composition':
+        relationshipText = `${rel.source} is composed of ${rel.target}`;
+        break;
+      case 'aggregation':
+        relationshipText = `${rel.source} contains ${rel.target}`;
+        break;
+      case 'dependency':
+        relationshipText = `${rel.source} depends on ${rel.target}`;
+        break;
+    }
+    enhancedDescription += `${relationshipText}${rel.label ? ` (${rel.label})` : ''}.\n`;
+  });
+  
+  enhancedDescription += `\nThis model represents a simplified interpretation of the system based on the input description.`;
   
   return {
     enhancedDescription,

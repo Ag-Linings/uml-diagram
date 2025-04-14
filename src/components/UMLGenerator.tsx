@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { processSpecs, generateUML, ProcessSpecsResponse, Entity, Relationship } from '../services/api';
 import { toast } from 'sonner';
 import MermaidRenderer from './MermaidRenderer';
 import EntityList from './EntityList';
 import { examples } from '../utils/examples';
-import { Lightbulb, RefreshCcw } from 'lucide-react';
+import { Lightbulb, RefreshCcw, AlignJustify, SquareDashedBottom, SquareArrowDown } from 'lucide-react';
+import EntityRelationshipEditor from './EntityRelationshipEditor';
 
 const UMLGenerator: React.FC = () => {
   const [description, setDescription] = useState('');
@@ -18,41 +20,84 @@ const UMLGenerator: React.FC = () => {
   const [processedSpecs, setProcessedSpecs] = useState<ProcessSpecsResponse | null>(null);
   const [umlSyntax, setUmlSyntax] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('specifications');
+  const [inputMode, setInputMode] = useState<'unified' | 'separate'>('unified');
+  
+  // For separate input mode
+  const [manualEntities, setManualEntities] = useState<Entity[]>([]);
+  const [manualRelationships, setManualRelationships] = useState<Relationship[]>([]);
 
   const handleExampleClick = (exampleDescription: string) => {
     setDescription(exampleDescription);
+    setInputMode('unified');
   };
 
   const handleSubmit = async () => {
-    if (!description.trim()) {
-      toast.error('Please enter a system description');
-      return;
-    }
+    if (inputMode === 'unified') {
+      if (!description.trim()) {
+        toast.error('Please enter a system description');
+        return;
+      }
 
-    try {
-      setLoading(true);
-      setProcessingStep('processing');
-      
-      // Step 1: Process the specifications with LLM
-      const specsResponse = await processSpecs({ description });
-      setProcessedSpecs(specsResponse);
-      
-      // Step 2: Generate the UML diagram
-      setProcessingStep('generating');
-      const umlResponse = await generateUML({
-        entities: specsResponse.entities,
-        relationships: specsResponse.relationships
-      });
-      
-      setUmlSyntax(umlResponse.umlSyntax);
-      toast.success('UML diagram generated successfully');
-      setActiveTab('diagram');
-    } catch (error) {
-      console.error('Error generating UML:', error);
-      toast.error('Failed to generate UML diagram');
-    } finally {
-      setLoading(false);
-      setProcessingStep('idle');
+      try {
+        setLoading(true);
+        setProcessingStep('processing');
+        
+        // Step 1: Process the specifications with LLM
+        const specsResponse = await processSpecs({ description });
+        setProcessedSpecs(specsResponse);
+        
+        // Step 2: Generate the UML diagram
+        setProcessingStep('generating');
+        const umlResponse = await generateUML({
+          entities: specsResponse.entities,
+          relationships: specsResponse.relationships
+        });
+        
+        setUmlSyntax(umlResponse.umlSyntax);
+        toast.success('UML diagram generated successfully');
+        setActiveTab('diagram');
+      } catch (error) {
+        console.error('Error generating UML:', error);
+        toast.error('Failed to generate UML diagram');
+      } finally {
+        setLoading(false);
+        setProcessingStep('idle');
+      }
+    } else {
+      // For separate input mode, skip the LLM processing
+      try {
+        if (manualEntities.length === 0) {
+          toast.error('Please define at least one entity');
+          return;
+        }
+        
+        setLoading(true);
+        setProcessingStep('generating');
+        
+        // Generate UML directly from manually entered entities and relationships
+        const umlResponse = await generateUML({
+          entities: manualEntities,
+          relationships: manualRelationships
+        });
+        
+        setUmlSyntax(umlResponse.umlSyntax);
+        
+        // Create a simplified processed specs to show in the structured view
+        setProcessedSpecs({
+          enhancedDescription: "Manually defined entities and relationships",
+          entities: manualEntities,
+          relationships: manualRelationships
+        });
+        
+        toast.success('UML diagram generated successfully');
+        setActiveTab('diagram');
+      } catch (error) {
+        console.error('Error generating UML:', error);
+        toast.error('Failed to generate UML diagram');
+      } finally {
+        setLoading(false);
+        setProcessingStep('idle');
+      }
     }
   };
 
@@ -79,44 +124,67 @@ const UMLGenerator: React.FC = () => {
   return (
     <div className="container mx-auto py-8 space-y-6">
       <Card className="p-6">
-        <h2 className="text-2xl font-bold mb-4">System Description</h2>
-        <div className="space-y-4">
-          <Textarea
-            placeholder="Describe your system here. For example: A university management system with students, professors, courses, and departments. Students can enroll in courses, professors teach courses, and departments manage courses and professors."
-            className="min-h-[150px]"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">System Description</h2>
+          <ToggleGroup type="single" value={inputMode} onValueChange={(value) => value && setInputMode(value as 'unified' | 'separate')}>
+            <ToggleGroupItem value="unified" aria-label="Unified input">
+              <AlignJustify className="h-4 w-4 mr-2" />
+              Text Description
+            </ToggleGroupItem>
+            <ToggleGroupItem value="separate" aria-label="Separate input">
+              <SquareDashedBottom className="h-4 w-4 mr-2" />
+              Entities & Relationships
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        
+        {inputMode === 'unified' ? (
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Describe your system here. For example: A university management system with students, professors, courses, and departments. Students can enroll in courses, professors teach courses, and departments manage courses and professors."
+              className="min-h-[150px]"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={loading}
+            />
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center">
+                <Lightbulb className="h-4 w-4 mr-1 text-amber-500" />
+                <span className="text-sm text-gray-500 mr-2">Try an example:</span>
+              </div>
+              {examples.map((example, index) => (
+                <Button 
+                  key={index} 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleExampleClick(example.description)}
+                  disabled={loading}
+                >
+                  {example.title}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <EntityRelationshipEditor
+            entities={manualEntities}
+            setEntities={setManualEntities}
+            relationships={manualRelationships}
+            setRelationships={setManualRelationships}
             disabled={loading}
           />
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center">
-              <Lightbulb className="h-4 w-4 mr-1 text-amber-500" />
-              <span className="text-sm text-gray-500 mr-2">Try an example:</span>
-            </div>
-            {examples.map((example, index) => (
-              <Button 
-                key={index} 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleExampleClick(example.description)}
-                disabled={loading}
-              >
-                {example.title}
-              </Button>
-            ))}
-          </div>
-          
-          <div className="flex justify-end">
+        )}
+        
+        <div className="flex justify-end mt-4">
           <Button 
             onClick={handleSubmit} 
-            disabled={loading || !description.trim()} 
+            disabled={loading || (inputMode === 'unified' ? !description.trim() : manualEntities.length === 0)} 
             style={{ backgroundColor: '#a89467' }}
             className="text-white hover:opacity-90"
           >
             Generate UML Diagram
           </Button>
-          </div>
         </div>
       </Card>
 

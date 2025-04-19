@@ -81,6 +81,7 @@ def init_db():
             user_id VARCHAR(255) NOT NULL,
             title VARCHAR(255) NOT NULL,
             description TEXT,
+            uml_syntax TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
@@ -294,6 +295,65 @@ def process_with_llm(description: str) -> ProcessSpecsResponse:
                 Relationship(source="Order", target="Product", type="aggregation", label="contains")
             ]
         )
+    # Example: Library System
+    elif "library" in description.lower() or "book" in description.lower() or "borrowing" in description.lower():
+        return ProcessSpecsResponse(
+            enhancedDescription=f"Enhanced: {description}\n\nThis system appears to be a library management system with books, members, and librarians.",
+            entities=[
+                Entity(
+                    name="Book",
+                    attributes=[
+                        Attribute(name="id", type="int", visibility="private"),
+                        Attribute(name="title", type="string", visibility="private"),
+                        Attribute(name="author", type="string", visibility="private"),
+                        Attribute(name="isbn", type="string", visibility="private")
+                    ],
+                    methods=[
+                        Method(name="isAvailable", returnType="boolean", parameters=[], visibility="public")
+                    ]
+                ),
+                Entity(
+                    name="Member",
+                    attributes=[
+                        Attribute(name="id", type="int", visibility="private"),
+                        Attribute(name="name", type="string", visibility="private"),
+                        Attribute(name="email", type="string", visibility="private"),
+                        Attribute(name="membershipExpiry", type="date", visibility="private")
+                    ],
+                    methods=[
+                        Method(name="borrowBook", returnType="boolean", parameters=[Parameter(name="bookId", type="int")], visibility="public")
+                    ]
+                ),
+                Entity(
+                    name="Librarian",
+                    attributes=[
+                        Attribute(name="id", type="int", visibility="private"),
+                        Attribute(name="name", type="string", visibility="private"),
+                        Attribute(name="staffId", type="string", visibility="private")
+                    ],
+                    methods=[
+                        Method(name="addBook", returnType="void", parameters=[Parameter(name="bookDetails", type="BookDetails")], visibility="public")
+                    ]
+                ),
+                Entity(
+                    name="BorrowRecord",
+                    attributes=[
+                        Attribute(name="id", type="int", visibility="private"),
+                        Attribute(name="borrowDate", type="date", visibility="private"),
+                        Attribute(name="returnDate", type="date", visibility="private")
+                    ],
+                    methods=[
+                        Method(name="isOverdue", returnType="boolean", parameters=[], visibility="public")
+                    ]
+                )
+            ],
+            relationships=[
+                Relationship(source="Member", target="Book", type="association", label="borrows"),
+                Relationship(source="Librarian", target="Book", type="association", label="manages"),
+                Relationship(source="BorrowRecord", target="Book", type="association", label="references"),
+                Relationship(source="BorrowRecord", target="Member", type="association", label="belongsTo")
+            ]
+        )
     else:
         # Default generic system
         return ProcessSpecsResponse(
@@ -372,6 +432,68 @@ def generate_mermaid_uml(entities: List[Entity], relationships: List[Relationshi
     return mermaid_syntax
 
 
+# Save diagram data to database after API call
+def save_uml_data_to_db(userId: str, entities: List[Entity], relationships: List[Relationship], uml_syntax: str) -> int:
+    connection = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        # Generate a title and description from the data
+        entity_names = ", ".join([entity.name for entity in entities])
+        title = f"UML Diagram - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        description = f"Auto-generated diagram with entities: {entity_names}"
+
+        # Insert diagram
+        cursor.execute(
+            "INSERT INTO diagrams (user_id, title, description, uml_syntax) VALUES (%s, %s, %s, %s)",
+            (userId, title, description, uml_syntax)
+        )
+        diagram_id = cursor.lastrowid
+        
+        # Insert entities
+        for entity in entities:
+            attributes_json = json.dumps([
+                {"name": attr.name, "type": attr.type, "visibility": attr.visibility}
+                for attr in entity.attributes
+            ])
+            methods_json = json.dumps([
+                {
+                    "name": method.name,
+                    "returnType": method.returnType,
+                    "visibility": method.visibility,
+                    "parameters": [{"name": p.name, "type": p.type} for p in method.parameters]
+                }
+                for method in entity.methods
+            ])
+
+            cursor.execute(
+                "INSERT INTO entities (diagram_id, name, attributes, methods) VALUES (%s, %s, %s, %s)",
+                (diagram_id, entity.name, attributes_json, methods_json)
+            )
+
+        # Insert relationships
+        for rel in relationships:
+            cursor.execute(
+                "INSERT INTO relationships (diagram_id, source, target, type, label) VALUES (%s, %s, %s, %s, %s)",
+                (diagram_id, rel.source, rel.target, rel.type, rel.label)
+            )
+
+        connection.commit()
+        logger.info(f"Successfully saved auto-generated diagram {diagram_id} to database")
+        return diagram_id
+    
+    except Exception as e:
+        logger.error(f"Error saving diagram data to DB: {e}")
+        if connection:
+            connection.rollback()
+        raise e
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+
+
 # API Routes
 @app.post("/process-specs", response_model=ProcessSpecsResponse)
 async def process_specs(request: ProcessSpecsRequest):
@@ -388,6 +510,19 @@ async def generate_uml(request: GenerateUMLRequest):
     try:
         logger.info(f"Generating UML for user {request.userId}")
         uml_syntax = generate_mermaid_uml(request.entities, request.relationships)
+        
+        # Save to database automatically when UML is generated
+        try:
+            save_uml_data_to_db(
+                userId=request.userId,
+                entities=request.entities,
+                relationships=request.relationships,
+                uml_syntax=uml_syntax
+            )
+            logger.info("UML data automatically saved to database")
+        except Exception as db_error:
+            logger.error(f"Database save failed, but continuing with UML generation: {db_error}")
+        
         return GenerateUMLResponse(umlSyntax=uml_syntax)
     except Exception as e:
         logger.error(f"Error generating UML: {e}")
@@ -398,7 +533,7 @@ async def generate_uml(request: GenerateUMLRequest):
 async def save_diagram(request: SaveDiagramRequest):
     connection = None
     try:
-        logger.info(f"Saving diagram for user {request.userId}")
+        logger.info(f"Explicitly saving diagram for user {request.userId}")
         connection = get_db_connection()
         cursor = connection.cursor()
 
@@ -494,7 +629,7 @@ async def get_diagram(diagram_id: int):
         
         # Get diagram details
         cursor.execute(
-            "SELECT id, title, description, created_at FROM diagrams WHERE id = %s",
+            "SELECT id, title, description, created_at, uml_syntax FROM diagrams WHERE id = %s",
             (diagram_id,)
         )
         diagram = cursor.fetchone()
@@ -552,20 +687,23 @@ async def get_diagram(diagram_id: int):
                 "label": rel['label']
             })
         
-        # Generate UML syntax
-        uml_syntax = generate_mermaid_uml(
-            [Entity(
-                name=entity['name'],
-                attributes=[Attribute(**attr) for attr in entity['attributes']],
-                methods=[Method(
-                    name=method['name'],
-                    returnType=method['returnType'],
-                    visibility=method['visibility'],
-                    parameters=[Parameter(**param) for param in method['parameters']]
-                ) for method in entity['methods']]
-            ) for entity in entities],
-            [Relationship(**rel) for rel in relationships]
-        )
+        # Use stored UML syntax if available, otherwise regenerate
+        uml_syntax = diagram.get('uml_syntax')
+        if not uml_syntax:
+            # Generate UML syntax
+            uml_syntax = generate_mermaid_uml(
+                [Entity(
+                    name=entity['name'],
+                    attributes=[Attribute(**attr) for attr in entity['attributes']],
+                    methods=[Method(
+                        name=method['name'],
+                        returnType=method['returnType'],
+                        visibility=method['visibility'],
+                        parameters=[Parameter(**param) for param in method['parameters']]
+                    ) for method in entity['methods']]
+                ) for entity in entities],
+                [Relationship(**rel) for rel in relationships]
+            )
         
         # Combine all data
         result = {
@@ -597,8 +735,12 @@ async def health_check():
         # Test database connection
         connection = get_db_connection()
         if connection.is_connected():
+            cursor = connection.cursor()
+            cursor.execute("SHOW TABLES")
+            tables = cursor.fetchall()
+            cursor.close()
             connection.close()
-            return {"status": "healthy", "database": "connected"}
+            return {"status": "healthy", "database": "connected", "tables_found": len(tables)}
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}

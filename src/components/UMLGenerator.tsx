@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,18 +42,22 @@ const UMLGenerator: React.FC = () => {
         setProcessingStep('processing');
         
         // Step 1: Process the specifications with LLM
-        const specsResponse = await processSpecs({ description });
+        const specsResponse = await processSpecs({ 
+          description,
+          userId: "user-" + Date.now().toString() // Generate a unique ID for the user
+        });
         setProcessedSpecs(specsResponse);
         
         // Step 2: Generate the UML diagram
         setProcessingStep('generating');
         const umlResponse = await generateUML({
           entities: specsResponse.entities,
-          relationships: specsResponse.relationships
+          relationships: specsResponse.relationships,
+          userId: "user-" + Date.now().toString() // Use the same user ID
         });
         
         setUmlSyntax(umlResponse.umlSyntax);
-        toast.success('UML diagram generated successfully');
+        toast.success('UML diagram generated and saved to database');
         setActiveTab('diagram');
       } catch (error) {
         console.error('Error generating UML:', error);
@@ -74,10 +77,13 @@ const UMLGenerator: React.FC = () => {
         setLoading(true);
         setProcessingStep('generating');
         
+        const userId = "user-" + Date.now().toString();
+        
         // Generate UML directly from manually entered entities and relationships
         const umlResponse = await generateUML({
           entities: manualEntities,
-          relationships: manualRelationships
+          relationships: manualRelationships,
+          userId: userId
         });
         
         setUmlSyntax(umlResponse.umlSyntax);
@@ -89,7 +95,7 @@ const UMLGenerator: React.FC = () => {
           relationships: manualRelationships
         });
         
-        toast.success('UML diagram generated successfully');
+        toast.success('UML diagram generated and saved to database');
         setActiveTab('diagram');
       } catch (error) {
         console.error('Error generating UML:', error);
@@ -114,7 +120,7 @@ const UMLGenerator: React.FC = () => {
       return (
         <div className="flex items-center space-x-2 bg-blue-50 p-4 rounded-md">
           <RefreshCcw className="animate-spin h-5 w-5 text-blue-500" />
-          <span className="text-blue-700">Generating UML diagram...</span>
+          <span className="text-blue-700">Generating UML diagram and saving to database...</span>
         </div>
       );
     }

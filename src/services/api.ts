@@ -1,12 +1,9 @@
 
-// These are the mock API endpoints that would be actual REST API calls 
-// in a production environment with proper backend
-
-import { mockProcessSpecsResponse, mockGenerateUMLResponse } from './mockData';
-import { toast } from "sonner";
+// API Service for UML Generator
 
 export interface ProcessSpecsRequest {
   description: string;
+  userId?: string;
 }
 
 export interface ProcessSpecsResponse {
@@ -49,37 +46,142 @@ export interface Relationship {
 export interface GenerateUMLRequest {
   entities: Entity[];
   relationships: Relationship[];
+  userId?: string;
 }
 
 export interface GenerateUMLResponse {
   umlSyntax: string;
 }
 
-// Mock API calls that simulate server interaction
+export interface SaveDiagramRequest {
+  title: string;
+  description: string;
+  userId: string;
+  entities: Entity[];
+  relationships: Relationship[];
+  umlSyntax: string;
+}
+
+export interface DiagramHistoryItem {
+  id: number;
+  title: string;
+  description: string;
+  created_at: string;
+  entities: Entity[];
+  relationships: Relationship[];
+  umlSyntax: string;
+}
+
+// Get API URL from environment or default to localhost in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+// API calls to communicate with the backend
 export const processSpecs = async (request: ProcessSpecsRequest): Promise<ProcessSpecsResponse> => {
   try {
-    // In a real implementation, this would make an API call to /process-specs
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockProcessSpecsResponse(request.description));
-      }, 1500); // Simulate network delay
+    const response = await fetch(`${API_BASE_URL}/process-specs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to process specifications');
+    }
+
+    return await response.json();
   } catch (error) {
-    toast.error("Failed to process specifications");
+    console.error('API Error:', error);
     throw error;
   }
 };
 
 export const generateUML = async (request: GenerateUMLRequest): Promise<GenerateUMLResponse> => {
   try {
-    // In a real implementation, this would make an API call to /generate-uml
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockGenerateUMLResponse(request));
-      }, 800); // Simulate network delay
+    const response = await fetch(`${API_BASE_URL}/generate-uml`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to generate UML diagram');
+    }
+
+    return await response.json();
   } catch (error) {
-    toast.error("Failed to generate UML diagram");
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const saveDiagram = async (request: SaveDiagramRequest): Promise<{ diagramId: number }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/save-diagram`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to save diagram');
+    }
+
+    const result = await response.json();
+    return { diagramId: result.diagram_id };
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const getDiagrams = async (userId: string): Promise<DiagramHistoryItem[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/diagrams/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to fetch diagrams');
+    }
+
+    const result = await response.json();
+    return result.diagrams;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const getDiagram = async (diagramId: number): Promise<DiagramHistoryItem> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/diagram/${diagramId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to fetch diagram');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
     throw error;
   }
 };

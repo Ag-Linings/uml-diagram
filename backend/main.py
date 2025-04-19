@@ -8,6 +8,12 @@ from mysql.connector import Error
 import json
 import os
 import datetime
+import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -23,24 +29,43 @@ app.add_middleware(
 # Environment variables for MySQL connection - will be provided by user
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
 DB_NAME = os.getenv("DB_NAME", "uml_generator")
 DB_PORT = os.getenv("DB_PORT", "3306")
 
-# Database connection function
+logger.info(f"Database configuration: Host={DB_HOST}, User={DB_USER}, DB={DB_NAME}, Port={DB_PORT}")
+
+# Max retries for DB connection
+MAX_RETRIES = 5
+RETRY_DELAY = 5  # seconds
+
+# Database connection function with retry logic
 def get_db_connection():
-    try:
-        connection = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            port=DB_PORT
-        )
-        return connection
-    except Error as e:
-        print(f"Error connecting to MySQL: {e}")
-        raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
+    retry_count = 0
+    while retry_count < MAX_RETRIES:
+        try:
+            connection = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME,
+                port=int(DB_PORT)
+            )
+            if connection.is_connected():
+                logger.info("Successfully connected to MySQL database")
+                return connection
+        except Error as e:
+            retry_count += 1
+            logger.error(f"Error connecting to MySQL (Attempt {retry_count}/{MAX_RETRIES}): {e}")
+            if retry_count < MAX_RETRIES:
+                logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error("Max retries reached. Could not connect to database.")
+                raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
+    
+    # If we get here, we've exhausted all retries
+    raise HTTPException(status_code=500, detail="Could not connect to database after multiple attempts")
 
 
 # Create necessary tables if they don't exist
@@ -87,11 +112,12 @@ def init_db():
         ''')
         
         connection.commit()
-        print("Database tables created successfully!")
+        logger.info("Database tables created successfully!")
     except Error as e:
-        print(f"Error creating database tables: {e}")
+        logger.error(f"Error creating database tables: {e}")
+        raise HTTPException(status_code=500, detail=f"Database initialization error: {str(e)}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
 
@@ -99,6 +125,7 @@ def init_db():
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
+    logger.info("Starting application and initializing database...")
     init_db()
 
 
@@ -349,23 +376,30 @@ def generate_mermaid_uml(entities: List[Entity], relationships: List[Relationshi
 @app.post("/process-specs", response_model=ProcessSpecsResponse)
 async def process_specs(request: ProcessSpecsRequest):
     try:
+        logger.info(f"Processing specs for user {request.userId}")
         return process_with_llm(request.description)
     except Exception as e:
+        logger.error(f"Error processing specs: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing specs: {str(e)}")
 
 
 @app.post("/generate-uml", response_model=GenerateUMLResponse)
 async def generate_uml(request: GenerateUMLRequest):
     try:
+        logger.info(f"Generating UML for user {request.userId}")
         uml_syntax = generate_mermaid_uml(request.entities, request.relationships)
         return GenerateUMLResponse(umlSyntax=uml_syntax)
     except Exception as e:
+        logger.error(f"Error generating UML: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating UML: {str(e)}")
 
 
 @app.post("/save-diagram")
-async def save_diagram(request: SaveDiagramRequest, connection=Depends(get_db_connection)):
+async def save_diagram(request: SaveDiagramRequest):
+    connection = None
     try:
+        logger.info(f"Saving diagram for user {request.userId}")
+        connection = get_db_connection()
         cursor = connection.cursor()
         
         # Insert diagram
@@ -374,6 +408,7 @@ async def save_diagram(request: SaveDiagramRequest, connection=Depends(get_db_co
             (request.userId, request.title, request.description)
         )
         diagram_id = cursor.lastrowid
+        logger.info(f"Created diagram with ID: {diagram_id}")
         
         # Insert entities
         for entity in request.entities:
@@ -382,8 +417,20 @@ async def save_diagram(request: SaveDiagramRequest, connection=Depends(get_db_co
                 (
                     diagram_id,
                     entity.name,
-                    json.dumps([attr.dict() for attr in entity.attributes]),
-                    json.dumps([method.dict() for method in entity.methods])
+                    json.dumps([{
+                        "name": attr.name,
+                        "type": attr.type,
+                        "visibility": attr.visibility
+                    } for attr in entity.attributes]),
+                    json.dumps([{
+                        "name": method.name,
+                        "returnType": method.returnType,
+                        "visibility": method.visibility,
+                        "parameters": [{
+                            "name": param.name,
+                            "type": param.type
+                        } for param in method.parameters]
+                    } for method in entity.methods])
                 )
             )
         
@@ -395,19 +442,26 @@ async def save_diagram(request: SaveDiagramRequest, connection=Depends(get_db_co
             )
         
         connection.commit()
+        logger.info(f"Successfully saved diagram {diagram_id} to database")
         
         return {"status": "success", "diagram_id": diagram_id}
     except Exception as e:
-        connection.rollback()
+        logger.error(f"Error saving diagram: {e}")
+        if connection:
+            connection.rollback()
         raise HTTPException(status_code=500, detail=f"Error saving diagram: {str(e)}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
+            connection.close()
 
 
 @app.get("/diagrams/{user_id}")
-async def get_diagrams(user_id: str, connection=Depends(get_db_connection)):
+async def get_diagrams(user_id: str):
+    connection = None
     try:
+        logger.info(f"Fetching diagrams for user {user_id}")
+        connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         
         # Get all diagrams for the user
@@ -422,17 +476,23 @@ async def get_diagrams(user_id: str, connection=Depends(get_db_connection)):
             if isinstance(diagram['created_at'], datetime.datetime):
                 diagram['created_at'] = diagram['created_at'].isoformat()
         
+        logger.info(f"Found {len(diagrams)} diagrams for user {user_id}")
         return {"diagrams": diagrams}
     except Exception as e:
+        logger.error(f"Error fetching diagrams: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching diagrams: {str(e)}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
+            connection.close()
 
 
 @app.get("/diagram/{diagram_id}")
-async def get_diagram(diagram_id: int, connection=Depends(get_db_connection)):
+async def get_diagram(diagram_id: int):
+    connection = None
     try:
+        logger.info(f"Fetching diagram with ID {diagram_id}")
+        connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         
         # Get diagram details
@@ -443,6 +503,7 @@ async def get_diagram(diagram_id: int, connection=Depends(get_db_connection)):
         diagram = cursor.fetchone()
         
         if not diagram:
+            logger.warning(f"Diagram not found with ID {diagram_id}")
             raise HTTPException(status_code=404, detail="Diagram not found")
         
         # Format the timestamp
@@ -466,8 +527,18 @@ async def get_diagram(diagram_id: int, connection=Depends(get_db_connection)):
         # Process entities
         entities = []
         for entity in entities_raw:
-            attributes = json.loads(entity['attributes'])
-            methods = json.loads(entity['methods'])
+            attributes_json = entity['attributes']
+            methods_json = entity['methods']
+            
+            # Handle string or bytes
+            if isinstance(attributes_json, bytes):
+                attributes_json = attributes_json.decode('utf-8')
+            if isinstance(methods_json, bytes):
+                methods_json = methods_json.decode('utf-8')
+                
+            attributes = json.loads(attributes_json)
+            methods = json.loads(methods_json)
+            
             entities.append({
                 "name": entity['name'],
                 "attributes": attributes,
@@ -486,7 +557,16 @@ async def get_diagram(diagram_id: int, connection=Depends(get_db_connection)):
         
         # Generate UML syntax
         uml_syntax = generate_mermaid_uml(
-            [Entity(**entity) for entity in entities],
+            [Entity(
+                name=entity['name'],
+                attributes=[Attribute(**attr) for attr in entity['attributes']],
+                methods=[Method(
+                    name=method['name'],
+                    returnType=method['returnType'],
+                    visibility=method['visibility'],
+                    parameters=[Parameter(**param) for param in method['parameters']]
+                ) for method in entity['methods']]
+            ) for entity in entities],
             [Relationship(**rel) for rel in relationships]
         )
         
@@ -501,14 +581,30 @@ async def get_diagram(diagram_id: int, connection=Depends(get_db_connection)):
             "umlSyntax": uml_syntax
         }
         
+        logger.info(f"Successfully retrieved diagram {diagram_id}")
         return result
     except HTTPException as e:
         raise e
     except Exception as e:
+        logger.error(f"Error fetching diagram: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching diagram: {str(e)}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
+            connection.close()
+
+
+@app.get("/health")
+async def health_check():
+    try:
+        # Test database connection
+        connection = get_db_connection()
+        if connection.is_connected():
+            connection.close()
+            return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 
 if __name__ == "__main__":

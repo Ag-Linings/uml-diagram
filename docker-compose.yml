@@ -29,6 +29,12 @@ services:
       - DB_PORT=3306
     volumes:
       - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   mysql:
     image: mysql:8.0
@@ -42,6 +48,11 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-password}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   mysql-data:

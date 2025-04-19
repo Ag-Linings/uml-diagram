@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-import { Entity, Attribute, Method, Parameter, Relationship } from '../services/api';
-import { PlusCircle, Trash2, Edit, Check, X, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Entity, Attribute, Method, Parameter, Relationship } from '../services/api';
+import { Plus, Trash2, ArrowRight, Edit2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface EntityRelationshipEditorProps {
   entities: Entity[];
@@ -17,473 +17,410 @@ interface EntityRelationshipEditorProps {
   disabled?: boolean;
 }
 
-const EntityRelationshipEditor: React.FC<EntityRelationshipEditorProps> = ({
-  entities,
-  setEntities,
-  relationships,
-  setRelationships,
-  disabled = false
+const EntityRelationshipEditor: React.FC<EntityRelationshipEditorProps> = ({ 
+  entities, 
+  setEntities, 
+  relationships, 
+  setRelationships, 
+  disabled = false 
 }) => {
-  const [activeTab, setActiveTab] = useState('entities');
-  const [newEntityName, setNewEntityName] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('entities');
   
-  // Entity editing states
-  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
-  const [newAttribute, setNewAttribute] = useState<Partial<Attribute>>({
-    name: '',
-    type: '',
-    visibility: 'public'
-  });
-  const [newMethod, setNewMethod] = useState<Partial<Method>>({
-    name: '',
-    returnType: '',
-    parameters: [],
-    visibility: 'public'
-  });
-  const [newParameter, setNewParameter] = useState<Partial<Parameter>>({
-    name: '',
-    type: ''
-  });
-
-  // Relationship editing states
-  const [newRelationship, setNewRelationship] = useState<Partial<Relationship>>({
-    source: '',
-    target: '',
-    type: 'association',
-    label: ''
-  });
-
+  // Entity form state
+  const [entityName, setEntityName] = useState('');
+  const [editingEntityIndex, setEditingEntityIndex] = useState<number | null>(null);
+  
+  // Attribute form state
+  const [attributeName, setAttributeName] = useState('');
+  const [attributeType, setAttributeType] = useState('');
+  const [attributeVisibility, setAttributeVisibility] = useState<'public' | 'private' | 'protected'>('private');
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
+  const [editingAttributeIndex, setEditingAttributeIndex] = useState<number | null>(null);
+  
+  // Method form state
+  const [methodName, setMethodName] = useState('');
+  const [methodReturnType, setMethodReturnType] = useState('');
+  const [methodVisibility, setMethodVisibility] = useState<'public' | 'private' | 'protected'>('public');
+  const [methods, setMethods] = useState<Method[]>([]);
+  const [editingMethodIndex, setEditingMethodIndex] = useState<number | null>(null);
+  
+  // Parameter form state
+  const [paramName, setParamName] = useState('');
+  const [paramType, setParamType] = useState('');
+  const [parameters, setParameters] = useState<Parameter[]>([]);
+  const [editingParamIndex, setEditingParamIndex] = useState<number | null>(null);
+  
+  // Relationship form state
+  const [relationSource, setRelationSource] = useState('');
+  const [relationTarget, setRelationTarget] = useState('');
+  const [relationType, setRelationType] = useState<'association' | 'inheritance' | 'composition' | 'aggregation' | 'dependency'>('association');
+  const [relationLabel, setRelationLabel] = useState('');
+  const [editingRelationIndex, setEditingRelationIndex] = useState<number | null>(null);
+  
+  // Reset all entity form fields
+  const resetEntityFormFields = () => {
+    setEntityName('');
+    setAttributes([]);
+    setMethods([]);
+    setEditingEntityIndex(null);
+  };
+  
+  // Reset attribute form
+  const resetAttributeForm = () => {
+    setAttributeName('');
+    setAttributeType('');
+    setAttributeVisibility('private');
+    setEditingAttributeIndex(null);
+  };
+  
+  // Reset method form
+  const resetMethodForm = () => {
+    setMethodName('');
+    setMethodReturnType('');
+    setMethodVisibility('public');
+    setParameters([]);
+    setEditingMethodIndex(null);
+  };
+  
+  // Reset parameter form
+  const resetParamForm = () => {
+    setParamName('');
+    setParamType('');
+    setEditingParamIndex(null);
+  };
+  
+  // Reset relationship form
+  const resetRelationshipForm = () => {
+    setRelationSource('');
+    setRelationTarget('');
+    setRelationType('association');
+    setRelationLabel('');
+    setEditingRelationIndex(null);
+  };
+  
+  // Add parameter
+  const handleAddParameter = () => {
+    if (!paramName || !paramType) return;
+    
+    const newParam: Parameter = {
+      name: paramName,
+      type: paramType
+    };
+    
+    if (editingParamIndex !== null) {
+      const updatedParams = [...parameters];
+      updatedParams[editingParamIndex] = newParam;
+      setParameters(updatedParams);
+    } else {
+      setParameters([...parameters, newParam]);
+    }
+    
+    resetParamForm();
+  };
+  
+  // Edit parameter
+  const handleEditParameter = (index: number) => {
+    const param = parameters[index];
+    setParamName(param.name);
+    setParamType(param.type);
+    setEditingParamIndex(index);
+  };
+  
+  // Delete parameter
+  const handleDeleteParameter = (index: number) => {
+    setParameters(parameters.filter((_, i) => i !== index));
+  };
+  
+  // Add attribute
+  const handleAddAttribute = () => {
+    if (!attributeName || !attributeType) return;
+    
+    const newAttribute: Attribute = {
+      name: attributeName,
+      type: attributeType,
+      visibility: attributeVisibility
+    };
+    
+    if (editingAttributeIndex !== null) {
+      const updatedAttributes = [...attributes];
+      updatedAttributes[editingAttributeIndex] = newAttribute;
+      setAttributes(updatedAttributes);
+    } else {
+      setAttributes([...attributes, newAttribute]);
+    }
+    
+    resetAttributeForm();
+  };
+  
+  // Edit attribute
+  const handleEditAttribute = (index: number) => {
+    const attr = attributes[index];
+    setAttributeName(attr.name);
+    setAttributeType(attr.type);
+    setAttributeVisibility(attr.visibility);
+    setEditingAttributeIndex(index);
+  };
+  
+  // Delete attribute
+  const handleDeleteAttribute = (index: number) => {
+    setAttributes(attributes.filter((_, i) => i !== index));
+  };
+  
+  // Add method
+  const handleAddMethod = () => {
+    if (!methodName || !methodReturnType) return;
+    
+    const newMethod: Method = {
+      name: methodName,
+      returnType: methodReturnType,
+      visibility: methodVisibility,
+      parameters: [...parameters]
+    };
+    
+    if (editingMethodIndex !== null) {
+      const updatedMethods = [...methods];
+      updatedMethods[editingMethodIndex] = newMethod;
+      setMethods(updatedMethods);
+    } else {
+      setMethods([...methods, newMethod]);
+    }
+    
+    resetMethodForm();
+  };
+  
+  // Edit method
+  const handleEditMethod = (index: number) => {
+    const method = methods[index];
+    setMethodName(method.name);
+    setMethodReturnType(method.returnType);
+    setMethodVisibility(method.visibility);
+    setParameters([...method.parameters]);
+    setEditingMethodIndex(index);
+  };
+  
+  // Delete method
+  const handleDeleteMethod = (index: number) => {
+    setMethods(methods.filter((_, i) => i !== index));
+  };
+  
+  // Add entity
   const handleAddEntity = () => {
-    if (!newEntityName.trim()) return;
+    if (!entityName) return;
     
     const newEntity: Entity = {
-      name: newEntityName.trim(),
-      attributes: [],
-      methods: []
+      name: entityName,
+      attributes: [...attributes],
+      methods: [...methods]
     };
     
-    setEntities([...entities, newEntity]);
-    setNewEntityName('');
+    if (editingEntityIndex !== null) {
+      const updatedEntities = [...entities];
+      updatedEntities[editingEntityIndex] = newEntity;
+      setEntities(updatedEntities);
+      
+      // Also update any relationships that reference this entity
+      const oldEntityName = entities[editingEntityIndex].name;
+      if (oldEntityName !== entityName) {
+        const updatedRelationships = relationships.map(rel => {
+          if (rel.source === oldEntityName) {
+            return { ...rel, source: entityName };
+          }
+          if (rel.target === oldEntityName) {
+            return { ...rel, target: entityName };
+          }
+          return rel;
+        });
+        setRelationships(updatedRelationships);
+      }
+    } else {
+      setEntities([...entities, newEntity]);
+    }
+    
+    resetEntityFormFields();
   };
-
+  
+  // Edit entity
+  const handleEditEntity = (index: number) => {
+    const entity = entities[index];
+    setEntityName(entity.name);
+    setAttributes([...entity.attributes]);
+    setMethods([...entity.methods]);
+    setEditingEntityIndex(index);
+  };
+  
+  // Delete entity
   const handleDeleteEntity = (index: number) => {
-    const updatedEntities = [...entities];
-    const deletedEntityName = updatedEntities[index].name;
+    const entityName = entities[index].name;
     
     // Remove the entity
-    updatedEntities.splice(index, 1);
+    const updatedEntities = entities.filter((_, i) => i !== index);
     setEntities(updatedEntities);
     
-    // Remove any relationships involving this entity
+    // Remove any relationships that reference this entity
     const updatedRelationships = relationships.filter(
-      rel => rel.source !== deletedEntityName && rel.target !== deletedEntityName
+      rel => rel.source !== entityName && rel.target !== entityName
     );
     setRelationships(updatedRelationships);
   };
-
-  const handleEditEntity = (entity: Entity) => {
-    setEditingEntity({...entity});
-  };
-
-  const handleSaveEntity = () => {
-    if (!editingEntity) return;
-    
-    const updatedEntities = entities.map(entity => 
-      entity.name === editingEntity.name ? editingEntity : entity
-    );
-    
-    setEntities(updatedEntities);
-    setEditingEntity(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingEntity(null);
-  };
-
-  const handleAddAttribute = () => {
-    if (!editingEntity || !newAttribute.name || !newAttribute.type) return;
-    
-    const attribute: Attribute = {
-      name: newAttribute.name,
-      type: newAttribute.type,
-      visibility: newAttribute.visibility as 'public' | 'private' | 'protected'
-    };
-    
-    setEditingEntity({
-      ...editingEntity,
-      attributes: [...editingEntity.attributes, attribute]
-    });
-    
-    setNewAttribute({
-      name: '',
-      type: '',
-      visibility: 'public'
-    });
-  };
-
-  const handleDeleteAttribute = (index: number) => {
-    if (!editingEntity) return;
-    
-    const updatedAttributes = [...editingEntity.attributes];
-    updatedAttributes.splice(index, 1);
-    
-    setEditingEntity({
-      ...editingEntity,
-      attributes: updatedAttributes
-    });
-  };
-
-  const handleAddParameter = () => {
-    if (!newParameter.name || !newParameter.type) return;
-    
-    const parameter: Parameter = {
-      name: newParameter.name,
-      type: newParameter.type
-    };
-    
-    setNewMethod({
-      ...newMethod,
-      parameters: [...newMethod.parameters || [], parameter]
-    });
-    
-    setNewParameter({
-      name: '',
-      type: ''
-    });
-  };
-
-  const handleDeleteParameter = (index: number) => {
-    if (!newMethod.parameters) return;
-    
-    const updatedParameters = [...newMethod.parameters];
-    updatedParameters.splice(index, 1);
-    
-    setNewMethod({
-      ...newMethod,
-      parameters: updatedParameters
-    });
-  };
-
-  const handleAddMethod = () => {
-    if (!editingEntity || !newMethod.name) return;
-    
-    const method: Method = {
-      name: newMethod.name,
-      returnType: newMethod.returnType || 'void',
-      parameters: newMethod.parameters || [],
-      visibility: newMethod.visibility as 'public' | 'private' | 'protected'
-    };
-    
-    setEditingEntity({
-      ...editingEntity,
-      methods: [...editingEntity.methods, method]
-    });
-    
-    setNewMethod({
-      name: '',
-      returnType: '',
-      parameters: [],
-      visibility: 'public'
-    });
-  };
-
-  const handleDeleteMethod = (index: number) => {
-    if (!editingEntity) return;
-    
-    const updatedMethods = [...editingEntity.methods];
-    updatedMethods.splice(index, 1);
-    
-    setEditingEntity({
-      ...editingEntity,
-      methods: updatedMethods
-    });
-  };
-
+  
+  // Add relationship
   const handleAddRelationship = () => {
-    if (!newRelationship.source || !newRelationship.target || !newRelationship.type) return;
+    if (!relationSource || !relationTarget || !relationType) return;
     
-    const relationship: Relationship = {
-      source: newRelationship.source,
-      target: newRelationship.target,
-      type: newRelationship.type as 'inheritance' | 'composition' | 'aggregation' | 'association' | 'dependency',
-      label: newRelationship.label
+    const newRelationship: Relationship = {
+      source: relationSource,
+      target: relationTarget,
+      type: relationType,
+      label: relationLabel || undefined
     };
     
-    setRelationships([...relationships, relationship]);
+    if (editingRelationIndex !== null) {
+      const updatedRelationships = [...relationships];
+      updatedRelationships[editingRelationIndex] = newRelationship;
+      setRelationships(updatedRelationships);
+    } else {
+      setRelationships([...relationships, newRelationship]);
+    }
     
-    setNewRelationship({
-      source: '',
-      target: '',
-      type: 'association',
-      label: ''
-    });
+    resetRelationshipForm();
   };
-
+  
+  // Edit relationship
+  const handleEditRelationship = (index: number) => {
+    const rel = relationships[index];
+    setRelationSource(rel.source);
+    setRelationTarget(rel.target);
+    setRelationType(rel.type);
+    setRelationLabel(rel.label || '');
+    setEditingRelationIndex(index);
+  };
+  
+  // Delete relationship
   const handleDeleteRelationship = (index: number) => {
-    const updatedRelationships = [...relationships];
-    updatedRelationships.splice(index, 1);
-    setRelationships(updatedRelationships);
+    setRelationships(relationships.filter((_, i) => i !== index));
+  };
+  
+  // Visibility badge color
+  const getVisibilityColor = (visibility: string) => {
+    switch (visibility) {
+      case 'public': return 'bg-green-100 text-green-800';
+      case 'private': return 'bg-red-100 text-red-800';
+      case 'protected': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  // Relationship type badge color
+  const getRelationshipColor = (type: string) => {
+    switch (type) {
+      case 'inheritance': return 'bg-purple-100 text-purple-800';
+      case 'composition': return 'bg-blue-100 text-blue-800';
+      case 'aggregation': return 'bg-teal-100 text-teal-800';
+      case 'dependency': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const renderEntityList = () => (
-    <div className="space-y-4">
-      <div className="flex items-end space-x-2">
-        <div className="flex-1">
-          <Label htmlFor="entityName">New Entity Name</Label>
-          <Input
-            id="entityName"
-            value={newEntityName}
-            onChange={(e) => setNewEntityName(e.target.value)}
-            placeholder="Enter entity name (e.g., Student)"
-            disabled={disabled}
-          />
-        </div>
-        <Button 
-          onClick={handleAddEntity} 
-          disabled={!newEntityName.trim() || disabled}
-          style={{ backgroundColor: '#a89467' }}
-          className="text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Add Entity
-        </Button>
-      </div>
-      
-      <div className="space-y-3 mt-6">
-        <h3 className="text-lg font-medium">Defined Entities</h3>
-        {entities.length === 0 ? (
-          <p className="text-sm text-gray-500">No entities defined yet. Add entities above.</p>
-        ) : (
-          entities.map((entity, index) => (
-            <Card key={index} className="p-3 flex justify-between items-center">
-              <div>
-                <p className="font-medium">{entity.name}</p>
-                <p className="text-xs text-gray-500">
-                  {entity.attributes.length} attributes, {entity.methods.length} methods
-                </p>
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => handleEditEntity(entity)}
-                  disabled={disabled}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="icon"
-                  onClick={() => handleDeleteEntity(index)}
-                  disabled={disabled}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  const renderEntityEditor = () => {
-    if (!editingEntity) return null;
-    
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 bg-white">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold">Edit Entity: {editingEntity.name}</h3>
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline"
-                onClick={handleCancelEdit}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSaveEntity}
-                style={{ backgroundColor: '#a89467' }}
-                className="text-white hover:opacity-90"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Save
-              </Button>
-            </div>
-          </div>
-          
-          <Tabs defaultValue="attributes">
-            <TabsList>
-              <TabsTrigger value="attributes">Attributes</TabsTrigger>
-              <TabsTrigger value="methods">Methods</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="attributes" className="space-y-4">
-              <div className="bg-gray-50 p-3 rounded-md space-y-3">
-                <h4 className="font-medium">Add New Attribute</h4>
-                <div className="grid grid-cols-3 gap-2">
+  return (
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2 w-[300px]">
+          <TabsTrigger value="entities">Entities</TabsTrigger>
+          <TabsTrigger value="relationships">Relationships</TabsTrigger>
+        </TabsList>
+        
+        {/* Entities Tab */}
+        <TabsContent value="entities">
+          <Card className="p-4">
+            <div className="space-y-6">
+              {/* Entity Form */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">
+                  {editingEntityIndex !== null ? 'Edit Entity' : 'Add Entity'}
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <Label htmlFor="attrName">Name</Label>
+                    <label className="block text-sm font-medium mb-1">Entity Name</label>
                     <Input
-                      id="attrName"
-                      value={newAttribute.name}
-                      onChange={(e) => setNewAttribute({...newAttribute, name: e.target.value})}
-                      placeholder="age"
+                      placeholder="Entity Name"
+                      value={entityName}
+                      onChange={(e) => setEntityName(e.target.value)}
+                      disabled={disabled}
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="attrType">Type</Label>
-                    <Input
-                      id="attrType"
-                      value={newAttribute.type}
-                      onChange={(e) => setNewAttribute({...newAttribute, type: e.target.value})}
-                      placeholder="number"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="attrVisibility">Visibility</Label>
-                    <Select 
-                      value={newAttribute.visibility} 
-                      onValueChange={(value) => setNewAttribute({...newAttribute, visibility: value as 'public' | 'private' | 'protected'})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Visibility" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="public">public</SelectItem>
-                        <SelectItem value="private">private</SelectItem>
-                        <SelectItem value="protected">protected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleAddAttribute}
-                  disabled={!newAttribute.name || !newAttribute.type}
-                  className="mt-2"
-                  style={{ backgroundColor: '#a89467' }}
-                  size="sm"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Attribute
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="font-medium">Current Attributes</h4>
-                {editingEntity.attributes.length === 0 ? (
-                  <p className="text-sm text-gray-500">No attributes defined yet.</p>
-                ) : (
-                  editingEntity.attributes.map((attr, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-mono">
-                          {attr.visibility === 'public' ? '+' : attr.visibility === 'private' ? '-' : '#'}
-                        </span>
-                        <span>{attr.name}</span>
-                        <span className="text-gray-500">: {attr.type}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteAttribute(index)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="methods" className="space-y-4">
-              <div className="bg-gray-50 p-3 rounded-md space-y-3">
-                <h4 className="font-medium">Add New Method</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label htmlFor="methodName">Name</Label>
-                    <Input
-                      id="methodName"
-                      value={newMethod.name}
-                      onChange={(e) => setNewMethod({...newMethod, name: e.target.value})}
-                      placeholder="calculateTotal"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="methodReturnType">Return Type</Label>
-                    <Input
-                      id="methodReturnType"
-                      value={newMethod.returnType}
-                      onChange={(e) => setNewMethod({...newMethod, returnType: e.target.value})}
-                      placeholder="number (or void)"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="methodVisibility">Visibility</Label>
-                    <Select 
-                      value={newMethod.visibility} 
-                      onValueChange={(value) => setNewMethod({...newMethod, visibility: value as 'public' | 'private' | 'protected'})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Visibility" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="public">public</SelectItem>
-                        <SelectItem value="private">private</SelectItem>
-                        <SelectItem value="protected">protected</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
                 
-                <div className="mt-2 border-t pt-2">
-                  <h5 className="text-sm font-medium mb-2">Parameters</h5>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="paramName">Parameter Name</Label>
-                      <Input
-                        id="paramName"
-                        value={newParameter.name}
-                        onChange={(e) => setNewParameter({...newParameter, name: e.target.value})}
-                        placeholder="amount"
-                        size="sm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="paramType">Parameter Type</Label>
-                      <Input
-                        id="paramType"
-                        value={newParameter.type}
-                        onChange={(e) => setNewParameter({...newParameter, type: e.target.value})}
-                        placeholder="number"
-                        size="sm"
-                      />
-                    </div>
+                {/* Attributes Section */}
+                <div className="space-y-2">
+                  <h4 className="text-md font-medium">Attributes</h4>
+                  
+                  {/* Attribute Form */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      placeholder="Name"
+                      value={attributeName}
+                      onChange={(e) => setAttributeName(e.target.value)}
+                      disabled={disabled}
+                      size={10}
+                    />
+                    <Input
+                      placeholder="Type"
+                      value={attributeType}
+                      onChange={(e) => setAttributeType(e.target.value)}
+                      disabled={disabled}
+                      size={10}
+                    />
+                    <Select
+                      value={attributeVisibility}
+                      onValueChange={(value: 'public' | 'private' | 'protected') => setAttributeVisibility(value)}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Visibility" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="private">Private</SelectItem>
+                        <SelectItem value="public">Public</SelectItem>
+                        <SelectItem value="protected">Protected</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button
-                    onClick={handleAddParameter}
-                    disabled={!newParameter.name || !newParameter.type}
-                    className="mt-2"
-                    variant="outline"
-                    size="sm"
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleAddAttribute}
+                    disabled={disabled || !attributeName || !attributeType}
                   >
-                    Add Parameter
+                    {editingAttributeIndex !== null ? 'Update' : 'Add'} Attribute
                   </Button>
                   
-                  {(newMethod.parameters || []).length > 0 && (
+                  {/* Attribute List */}
+                  {attributes.length > 0 && (
                     <div className="mt-2 space-y-2">
-                      <h6 className="text-xs font-medium">Current Parameters:</h6>
-                      {(newMethod.parameters || []).map((param, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm bg-gray-100 p-1 rounded">
-                          <span>{param.name}: {param.type}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteParameter(index)}
+                      {attributes.map((attr, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 border rounded-md">
+                          <Badge className={getVisibilityColor(attr.visibility)}>
+                            {attr.visibility === 'public' ? '+' : attr.visibility === 'private' ? '-' : '#'}
+                          </Badge>
+                          <span className="flex-1">
+                            {attr.name}: {attr.type}
+                          </span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleEditAttribute(index)}
+                            disabled={disabled}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteAttribute(index)}
+                            disabled={disabled}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
                       ))}
@@ -491,192 +428,380 @@ const EntityRelationshipEditor: React.FC<EntityRelationshipEditorProps> = ({
                   )}
                 </div>
                 
-                <Button
-                  onClick={handleAddMethod}
-                  disabled={!newMethod.name}
-                  className="mt-3"
-                  style={{ backgroundColor: '#a89467' }}
-                  size="sm"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Method
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="font-medium">Current Methods</h4>
-                {editingEntity.methods.length === 0 ? (
-                  <p className="text-sm text-gray-500">No methods defined yet.</p>
-                ) : (
-                  editingEntity.methods.map((method, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-                      <div>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs font-mono">
-                            {method.visibility === 'public' ? '+' : method.visibility === 'private' ? '-' : '#'}
-                          </span>
-                          <span>{method.name}</span>
-                          <span className="text-gray-600">(</span>
-                          <span className="text-gray-500 text-xs">
-                            {method.parameters.map((p, i) => 
-                              `${p.name}: ${p.type}${i < method.parameters.length - 1 ? ', ' : ''}`
-                            )}
-                          </span>
-                          <span className="text-gray-600">)</span>
-                          <span className="text-gray-500">: {method.returnType}</span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteMethod(index)}
+                {/* Methods Section */}
+                <div className="space-y-2 border-t pt-4">
+                  <h4 className="text-md font-medium">Methods</h4>
+                  
+                  {/* Method Form */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      placeholder="Name"
+                      value={methodName}
+                      onChange={(e) => setMethodName(e.target.value)}
+                      disabled={disabled}
+                      size={10}
+                    />
+                    <Input
+                      placeholder="Return Type"
+                      value={methodReturnType}
+                      onChange={(e) => setMethodReturnType(e.target.value)}
+                      disabled={disabled}
+                      size={10}
+                    />
+                    <Select
+                      value={methodVisibility}
+                      onValueChange={(value: 'public' | 'private' | 'protected') => setMethodVisibility(value)}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Visibility" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">Public</SelectItem>
+                        <SelectItem value="private">Private</SelectItem>
+                        <SelectItem value="protected">Protected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Parameters Section */}
+                  <div className="pl-4 space-y-2">
+                    <h5 className="text-sm font-medium">Parameters</h5>
+                    
+                    {/* Parameter Form */}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Name"
+                        value={paramName}
+                        onChange={(e) => setParamName(e.target.value)}
+                        disabled={disabled}
+                        className="flex-1"
+                        size={10}
+                      />
+                      <Input
+                        placeholder="Type"
+                        value={paramType}
+                        onChange={(e) => setParamType(e.target.value)}
+                        disabled={disabled}
+                        className="flex-1"
+                        size={10}
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleAddParameter}
+                        disabled={disabled || !paramName || !paramType}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        {editingParamIndex !== null ? 'Update' : 'Add'}
                       </Button>
                     </div>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </Card>
-      </div>
-    );
-  };
-
-  const renderRelationshipEditor = () => (
-    <div className="space-y-4">
-      <div className="bg-gray-50 p-4 rounded-md space-y-3">
-        <h3 className="font-medium">Add New Relationship</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label htmlFor="relSource">Source Entity</Label>
-            <Select 
-              value={newRelationship.source} 
-              onValueChange={(value) => setNewRelationship({...newRelationship, source: value})}
-              disabled={disabled || entities.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select source entity" />
-              </SelectTrigger>
-              <SelectContent>
-                {entities.map((entity, index) => (
-                  <SelectItem key={index} value={entity.name}>
-                    {entity.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="relTarget">Target Entity</Label>
-            <Select 
-              value={newRelationship.target} 
-              onValueChange={(value) => setNewRelationship({...newRelationship, target: value})}
-              disabled={disabled || entities.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select target entity" />
-              </SelectTrigger>
-              <SelectContent>
-                {entities.map((entity, index) => (
-                  <SelectItem key={index} value={entity.name}>
-                    {entity.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="relType">Relationship Type</Label>
-            <Select 
-              value={newRelationship.type} 
-              onValueChange={(value) => setNewRelationship({...newRelationship, type: value as any})}
-              disabled={disabled}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select relationship type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="inheritance">Inheritance</SelectItem>
-                <SelectItem value="composition">Composition</SelectItem>
-                <SelectItem value="aggregation">Aggregation</SelectItem>
-                <SelectItem value="association">Association</SelectItem>
-                <SelectItem value="dependency">Dependency</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="relLabel">Relationship Label (Optional)</Label>
-            <Input
-              id="relLabel"
-              value={newRelationship.label || ''}
-              onChange={(e) => setNewRelationship({...newRelationship, label: e.target.value})}
-              placeholder="e.g., enrolls in, manages"
-              disabled={disabled}
-            />
-          </div>
-        </div>
-        <Button
-          onClick={handleAddRelationship}
-          disabled={!newRelationship.source || !newRelationship.target || !newRelationship.type || disabled}
-          className="mt-2"
-          style={{ backgroundColor: '#a89467' }}
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Add Relationship
-        </Button>
-      </div>
-      
-      <div className="space-y-3 mt-2">
-        <h3 className="text-lg font-medium">Defined Relationships</h3>
-        {relationships.length === 0 ? (
-          <p className="text-sm text-gray-500">No relationships defined yet. Add relationships above.</p>
-        ) : (
-          relationships.map((rel, index) => (
-            <Card key={index} className="p-3 flex justify-between items-center">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <p className="font-medium">{rel.source}</p>
-                  <p className="text-xs text-gray-500">({rel.type})</p>
-                  <p className="text-xs italic text-gray-500">{rel.label}</p>
-                  <p className="font-medium">{rel.target}</p>
+                    
+                    {/* Parameter List */}
+                    {parameters.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {parameters.map((param, index) => (
+                          <div key={index} className="flex items-center gap-2 p-1 border rounded-md">
+                            <span className="flex-1 text-sm">
+                              {param.name}: {param.type}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleEditParameter(index)}
+                              disabled={disabled}
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDeleteParameter(index)}
+                              disabled={disabled}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-500" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleAddMethod}
+                    disabled={disabled || !methodName || !methodReturnType}
+                    className="mt-2"
+                  >
+                    {editingMethodIndex !== null ? 'Update' : 'Add'} Method
+                  </Button>
+                  
+                  {/* Method List */}
+                  {methods.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {methods.map((method, index) => (
+                        <div key={index} className="p-2 border rounded-md">
+                          <div className="flex items-center gap-2">
+                            <Badge className={getVisibilityColor(method.visibility)}>
+                              {method.visibility === 'public' ? '+' : method.visibility === 'private' ? '-' : '#'}
+                            </Badge>
+                            <span className="flex-1">
+                              {method.name}({method.parameters.map(p => `${p.name}: ${p.type}`).join(', ')}): {method.returnType}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleEditMethod(index)}
+                              disabled={disabled}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDeleteMethod(index)}
+                              disabled={disabled}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end space-x-2">
+                  {editingEntityIndex !== null && (
+                    <Button 
+                      variant="outline"
+                      onClick={resetEntityFormFields}
+                      disabled={disabled}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={handleAddEntity}
+                    disabled={disabled || !entityName}
+                  >
+                    {editingEntityIndex !== null ? 'Update' : 'Add'} Entity
+                  </Button>
                 </div>
               </div>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => handleDeleteRelationship(index)}
-                disabled={disabled}
-              >
-                <Trash2 className="h-3 w-3 mr-1" />
-                Remove
-              </Button>
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div>
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="entities">Entities</TabsTrigger>
-          <TabsTrigger value="relationships">Relationships</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="entities" className="mt-4">
-          {renderEntityList()}
+              
+              {/* Entity List */}
+              {entities.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">Defined Entities</h3>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {entities.map((entity, index) => (
+                      <Card key={index} className="p-3">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold">{entity.name}</h4>
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleEditEntity(index)}
+                              disabled={disabled}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDeleteEntity(index)}
+                              disabled={disabled}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {entity.attributes.length > 0 && (
+                          <div className="mt-2">
+                            <h5 className="text-sm font-medium">Attributes:</h5>
+                            <ul className="pl-4 list-disc text-sm">
+                              {entity.attributes.map((attr, i) => (
+                                <li key={i}>
+                                  {attr.visibility === 'public' ? '+' : attr.visibility === 'private' ? '-' : '#'}
+                                  {attr.name}: {attr.type}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {entity.methods.length > 0 && (
+                          <div className="mt-2">
+                            <h5 className="text-sm font-medium">Methods:</h5>
+                            <ul className="pl-4 list-disc text-sm">
+                              {entity.methods.map((method, i) => (
+                                <li key={i}>
+                                  {method.visibility === 'public' ? '+' : method.visibility === 'private' ? '-' : '#'}
+                                  {method.name}({method.parameters.map(p => `${p.name}: ${p.type}`).join(', ')}): {method.returnType}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
         </TabsContent>
         
-        <TabsContent value="relationships" className="mt-4">
-          {renderRelationshipEditor()}
+        {/* Relationships Tab */}
+        <TabsContent value="relationships">
+          <Card className="p-4">
+            <div className="space-y-6">
+              {/* Relationship Form */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">
+                  {editingRelationIndex !== null ? 'Edit Relationship' : 'Add Relationship'}
+                </h3>
+                
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Source Entity</label>
+                    <Select 
+                      value={relationSource} 
+                      onValueChange={(value) => setRelationSource(value)}
+                      disabled={disabled || entities.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source entity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entities.map((entity, index) => (
+                          <SelectItem key={index} value={entity.name}>{entity.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Target Entity</label>
+                    <Select 
+                      value={relationTarget} 
+                      onValueChange={(value) => setRelationTarget(value)}
+                      disabled={disabled || entities.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target entity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entities.map((entity, index) => (
+                          <SelectItem key={index} value={entity.name}>{entity.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Relationship Type</label>
+                    <Select 
+                      value={relationType} 
+                      onValueChange={(value: 'association' | 'inheritance' | 'composition' | 'aggregation' | 'dependency') => 
+                        setRelationType(value)
+                      }
+                      disabled={disabled}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select relationship type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="association">Association</SelectItem>
+                        <SelectItem value="inheritance">Inheritance</SelectItem>
+                        <SelectItem value="composition">Composition</SelectItem>
+                        <SelectItem value="aggregation">Aggregation</SelectItem>
+                        <SelectItem value="dependency">Dependency</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Label (Optional)</label>
+                    <Input
+                      placeholder="Relationship Label"
+                      value={relationLabel}
+                      onChange={(e) => setRelationLabel(e.target.value)}
+                      disabled={disabled}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-2">
+                  {editingRelationIndex !== null && (
+                    <Button 
+                      variant="outline"
+                      onClick={resetRelationshipForm}
+                      disabled={disabled}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={handleAddRelationship}
+                    disabled={disabled || !relationSource || !relationTarget || !relationType || relationSource === relationTarget}
+                  >
+                    {editingRelationIndex !== null ? 'Update' : 'Add'} Relationship
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Relationships List */}
+              {relationships.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">Defined Relationships</h3>
+                  <div className="space-y-2">
+                    {relationships.map((rel, index) => (
+                      <Card key={index} className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{rel.source}</span>
+                          <ArrowRight className="h-4 w-4" />
+                          <span className="font-medium">{rel.target}</span>
+                          <Badge className={`ml-2 ${getRelationshipColor(rel.type)}`}>
+                            {rel.type}
+                          </Badge>
+                          {rel.label && (
+                            <span className="text-sm text-gray-500">
+                              "{rel.label}"
+                            </span>
+                          )}
+                          <div className="flex-grow"></div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleEditRelationship(index)}
+                            disabled={disabled}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteRelationship(index)}
+                            disabled={disabled}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
-      
-      {editingEntity && renderEntityEditor()}
     </div>
   );
 };

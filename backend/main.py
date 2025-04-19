@@ -29,7 +29,7 @@ app.add_middleware(
 # Environment variables for MySQL connection - will be provided by user
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "****")
 DB_NAME = os.getenv("DB_NAME", "uml_generator")
 DB_PORT = os.getenv("DB_PORT", "3306")
 
@@ -401,50 +401,47 @@ async def save_diagram(request: SaveDiagramRequest):
         logger.info(f"Saving diagram for user {request.userId}")
         connection = get_db_connection()
         cursor = connection.cursor()
-        
-        # Insert diagram
+
+        # Insert diagram with umlSyntax
         cursor.execute(
-            "INSERT INTO diagrams (user_id, title, description) VALUES (%s, %s, %s)",
-            (request.userId, request.title, request.description)
+            "INSERT INTO diagrams (user_id, title, description, uml_syntax) VALUES (%s, %s, %s, %s)",
+            (request.userId, request.title, request.description, request.umlSyntax)
         )
         diagram_id = cursor.lastrowid
         logger.info(f"Created diagram with ID: {diagram_id}")
-        
+
         # Insert entities
         for entity in request.entities:
+            attributes_json = json.dumps([
+                {"name": attr.name, "type": attr.type, "visibility": attr.visibility}
+                for attr in entity.attributes
+            ])
+            methods_json = json.dumps([
+                {
+                    "name": method.name,
+                    "returnType": method.returnType,
+                    "visibility": method.visibility,
+                    "parameters": [{"name": p.name, "type": p.type} for p in method.parameters]
+                }
+                for method in entity.methods
+            ])
+
             cursor.execute(
                 "INSERT INTO entities (diagram_id, name, attributes, methods) VALUES (%s, %s, %s, %s)",
-                (
-                    diagram_id,
-                    entity.name,
-                    json.dumps([{
-                        "name": attr.name,
-                        "type": attr.type,
-                        "visibility": attr.visibility
-                    } for attr in entity.attributes]),
-                    json.dumps([{
-                        "name": method.name,
-                        "returnType": method.returnType,
-                        "visibility": method.visibility,
-                        "parameters": [{
-                            "name": param.name,
-                            "type": param.type
-                        } for param in method.parameters]
-                    } for method in entity.methods])
-                )
+                (diagram_id, entity.name, attributes_json, methods_json)
             )
-        
+
         # Insert relationships
         for rel in request.relationships:
             cursor.execute(
                 "INSERT INTO relationships (diagram_id, source, target, type, label) VALUES (%s, %s, %s, %s, %s)",
                 (diagram_id, rel.source, rel.target, rel.type, rel.label)
             )
-        
+
         connection.commit()
         logger.info(f"Successfully saved diagram {diagram_id} to database")
-        
         return {"status": "success", "diagram_id": diagram_id}
+
     except Exception as e:
         logger.error(f"Error saving diagram: {e}")
         if connection:

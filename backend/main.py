@@ -446,7 +446,7 @@ def generate_mermaid_uml(entities: List[Entity], relationships: List[Relationshi
         label = f" : {rel.label}" if rel.label else ""
         mermaid_syntax += f"    {rel.source} {arrow} {rel.target}{label}\n"
     
-    return mermaid_syntax
+    return mermaid_syntax.strip()
 
 
 # Save diagram data to database after API call

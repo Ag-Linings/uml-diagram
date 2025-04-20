@@ -5,3 +5,4 @@ pydantic==2.3.0
 mysql-connector-python==8.1.0
 python-dotenv==1.0.0
 requests==2.31.0
+cryptography==42.0.4  # Required for secure MySQL connections

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,17 +10,18 @@ import { toast } from 'sonner';
 import MermaidRenderer from './MermaidRenderer';
 import EntityList from './EntityList';
 import { examples } from '../utils/examples';
-import { Lightbulb, RefreshCcw, AlignJustify, SquareDashedBottom, SquareArrowDown } from 'lucide-react';
+import { Lightbulb, RefreshCcw, AlignJustify, SquareDashedBottom, Database } from 'lucide-react';
 import EntityRelationshipEditor from './EntityRelationshipEditor';
 
 const UMLGenerator: React.FC = () => {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [processingStep, setProcessingStep] = useState<'idle' | 'processing' | 'generating'>('idle');
+  const [processingStep, setProcessingStep] = useState<'idle' | 'processing' | 'generating' | 'saving'>('idle');
   const [processedSpecs, setProcessedSpecs] = useState<ProcessSpecsResponse | null>(null);
   const [umlSyntax, setUmlSyntax] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('specifications');
   const [inputMode, setInputMode] = useState<'unified' | 'separate'>('unified');
+  const [lastDiagramId, setLastDiagramId] = useState<number | null>(null);
   
   // For separate input mode
   const [manualEntities, setManualEntities] = useState<Entity[]>([]);
@@ -41,10 +43,13 @@ const UMLGenerator: React.FC = () => {
         setLoading(true);
         setProcessingStep('processing');
         
+        // Generate a unique ID for the user
+        const userId = "user-" + Date.now().toString();
+        
         // Step 1: Process the specifications with LLM
         const specsResponse = await processSpecs({ 
           description,
-          userId: "user-" + Date.now().toString() // Generate a unique ID for the user
+          userId: userId
         });
         setProcessedSpecs(specsResponse);
         
@@ -53,15 +58,17 @@ const UMLGenerator: React.FC = () => {
         const umlResponse = await generateUML({
           entities: specsResponse.entities,
           relationships: specsResponse.relationships,
-          userId: "user-" + Date.now().toString() // Use the same user ID
+          userId: userId
         });
         
         setUmlSyntax(umlResponse.umlSyntax);
+        setProcessingStep('saving');
+        
         toast.success('UML diagram generated and saved to database');
         setActiveTab('diagram');
       } catch (error) {
         console.error('Error generating UML:', error);
-        toast.error('Failed to generate UML diagram');
+        toast.error('Failed to generate UML diagram: ' + (error instanceof Error ? error.message : String(error)));
       } finally {
         setLoading(false);
         setProcessingStep('idle');
@@ -95,11 +102,12 @@ const UMLGenerator: React.FC = () => {
           relationships: manualRelationships
         });
         
+        setProcessingStep('saving');
         toast.success('UML diagram generated and saved to database');
         setActiveTab('diagram');
       } catch (error) {
         console.error('Error generating UML:', error);
-        toast.error('Failed to generate UML diagram');
+        toast.error('Failed to generate UML diagram: ' + (error instanceof Error ? error.message : String(error)));
       } finally {
         setLoading(false);
         setProcessingStep('idle');
@@ -120,7 +128,15 @@ const UMLGenerator: React.FC = () => {
       return (
         <div className="flex items-center space-x-2 bg-blue-50 p-4 rounded-md">
           <RefreshCcw className="animate-spin h-5 w-5 text-blue-500" />
-          <span className="text-blue-700">Generating UML diagram and saving to database...</span>
+          <span className="text-blue-700">Generating UML diagram...</span>
+        </div>
+      );
+    }
+    if (processingStep === 'saving') {
+      return (
+        <div className="flex items-center space-x-2 bg-green-50 p-4 rounded-md">
+          <Database className="h-5 w-5 text-green-500" />
+          <span className="text-green-700">Saving UML data to database...</span>
         </div>
       );
     }
@@ -189,7 +205,7 @@ const UMLGenerator: React.FC = () => {
             style={{ backgroundColor: '#a89467' }}
             className="text-white hover:opacity-90"
           >
-            Generate UML Diagram
+            {loading ? 'Processing...' : 'Generate UML Diagram'}
           </Button>
         </div>
       </Card>
@@ -226,6 +242,12 @@ const UMLGenerator: React.FC = () => {
                 ) : (
                   <div className="p-4 bg-gray-50 text-gray-500 text-center rounded-md">
                     UML diagram will appear here
+                  </div>
+                )}
+                {lastDiagramId && (
+                  <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md">
+                    <Database className="inline-block h-4 w-4 mr-2" />
+                    Diagram successfully saved with ID: {lastDiagramId}
                   </div>
                 )}
               </Card>

@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,6 +9,7 @@ import os
 import datetime
 import time
 import logging
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +36,7 @@ DB_PORT = os.getenv("DB_PORT", "3306")
 logger.info(f"Database configuration: Host={DB_HOST}, User={DB_USER}, DB={DB_NAME}, Port={DB_PORT}")
 
 # Max retries for DB connection
-MAX_RETRIES = 5
+MAX_RETRIES = 10
 RETRY_DELAY = 5  # seconds
 
 # Database connection function with retry logic
@@ -49,7 +49,9 @@ def get_db_connection():
                 user=DB_USER,
                 password=DB_PASSWORD,
                 database=DB_NAME,
-                port=int(DB_PORT)
+                port=int(DB_PORT),
+                auth_plugin='mysql_native_password',
+                connection_timeout=30
             )
             if connection.is_connected():
                 logger.info("Successfully connected to MySQL database")
@@ -57,6 +59,7 @@ def get_db_connection():
         except Error as e:
             retry_count += 1
             logger.error(f"Error connecting to MySQL (Attempt {retry_count}/{MAX_RETRIES}): {e}")
+            logger.error(traceback.format_exc())
             if retry_count < MAX_RETRIES:
                 logger.info(f"Retrying in {RETRY_DELAY} seconds...")
                 time.sleep(RETRY_DELAY)
@@ -114,8 +117,22 @@ def init_db():
         
         connection.commit()
         logger.info("Database tables created successfully!")
+
+        # Test insert to verify write access
+        try:
+            cursor.execute(
+                "INSERT INTO diagrams (user_id, title, description, uml_syntax) VALUES (%s, %s, %s, %s)",
+                ("test-user", "Test Diagram", "This is a test", "classDiagram\n    class Test")
+            )
+            connection.commit()
+            logger.info("Test insert successful - database is ready for writing")
+        except Exception as e:
+            logger.error(f"Test insert failed: {e}")
+            logger.error(traceback.format_exc())
+
     except Error as e:
         logger.error(f"Error creating database tables: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Database initialization error: {str(e)}")
     finally:
         if connection and connection.is_connected():
@@ -436,6 +453,7 @@ def generate_mermaid_uml(entities: List[Entity], relationships: List[Relationshi
 def save_uml_data_to_db(userId: str, entities: List[Entity], relationships: List[Relationship], uml_syntax: str) -> int:
     connection = None
     try:
+        logger.info(f"Attempting to save UML data to DB for user {userId}")
         connection = get_db_connection()
         cursor = connection.cursor()
 
@@ -444,12 +462,15 @@ def save_uml_data_to_db(userId: str, entities: List[Entity], relationships: List
         title = f"UML Diagram - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         description = f"Auto-generated diagram with entities: {entity_names}"
 
+        logger.info(f"Inserting diagram into MySQL with title: {title}")
+        
         # Insert diagram
         cursor.execute(
             "INSERT INTO diagrams (user_id, title, description, uml_syntax) VALUES (%s, %s, %s, %s)",
             (userId, title, description, uml_syntax)
         )
         diagram_id = cursor.lastrowid
+        logger.info(f"Created diagram with ID: {diagram_id}")
         
         # Insert entities
         for entity in entities:
@@ -467,6 +488,7 @@ def save_uml_data_to_db(userId: str, entities: List[Entity], relationships: List
                 for method in entity.methods
             ])
 
+            logger.info(f"Inserting entity {entity.name} into MySQL")
             cursor.execute(
                 "INSERT INTO entities (diagram_id, name, attributes, methods) VALUES (%s, %s, %s, %s)",
                 (diagram_id, entity.name, attributes_json, methods_json)
@@ -474,17 +496,19 @@ def save_uml_data_to_db(userId: str, entities: List[Entity], relationships: List
 
         # Insert relationships
         for rel in relationships:
+            logger.info(f"Inserting relationship {rel.source} -> {rel.target} into MySQL")
             cursor.execute(
                 "INSERT INTO relationships (diagram_id, source, target, type, label) VALUES (%s, %s, %s, %s, %s)",
                 (diagram_id, rel.source, rel.target, rel.type, rel.label)
             )
 
         connection.commit()
-        logger.info(f"Successfully saved auto-generated diagram {diagram_id} to database")
+        logger.info(f"Successfully saved diagram {diagram_id} to database")
         return diagram_id
     
     except Exception as e:
         logger.error(f"Error saving diagram data to DB: {e}")
+        logger.error(traceback.format_exc())
         if connection:
             connection.rollback()
         raise e
@@ -502,6 +526,7 @@ async def process_specs(request: ProcessSpecsRequest):
         return process_with_llm(request.description)
     except Exception as e:
         logger.error(f"Error processing specs: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing specs: {str(e)}")
 
 
@@ -513,19 +538,21 @@ async def generate_uml(request: GenerateUMLRequest):
         
         # Save to database automatically when UML is generated
         try:
-            save_uml_data_to_db(
+            diagram_id = save_uml_data_to_db(
                 userId=request.userId,
                 entities=request.entities,
                 relationships=request.relationships,
                 uml_syntax=uml_syntax
             )
-            logger.info("UML data automatically saved to database")
+            logger.info(f"UML data automatically saved to database with ID: {diagram_id}")
         except Exception as db_error:
             logger.error(f"Database save failed, but continuing with UML generation: {db_error}")
+            logger.error(traceback.format_exc())
         
         return GenerateUMLResponse(umlSyntax=uml_syntax)
     except Exception as e:
         logger.error(f"Error generating UML: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating UML: {str(e)}")
 
 
@@ -558,7 +585,7 @@ async def save_diagram(request: SaveDiagramRequest):
                     "visibility": method.visibility,
                     "parameters": [{"name": p.name, "type": p.type} for p in method.parameters]
                 }
-                for method in entity.methods
+                for method in method.methods
             ])
 
             cursor.execute(
@@ -579,6 +606,7 @@ async def save_diagram(request: SaveDiagramRequest):
 
     except Exception as e:
         logger.error(f"Error saving diagram: {e}")
+        logger.error(traceback.format_exc())
         if connection:
             connection.rollback()
         raise HTTPException(status_code=500, detail=f"Error saving diagram: {str(e)}")
@@ -612,6 +640,7 @@ async def get_diagrams(user_id: str):
         return {"diagrams": diagrams}
     except Exception as e:
         logger.error(f"Error fetching diagrams: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error fetching diagrams: {str(e)}")
     finally:
         if connection and connection.is_connected():
@@ -722,6 +751,7 @@ async def get_diagram(diagram_id: int):
         raise e
     except Exception as e:
         logger.error(f"Error fetching diagram: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error fetching diagram: {str(e)}")
     finally:
         if connection and connection.is_connected():
@@ -738,11 +768,22 @@ async def health_check():
             cursor = connection.cursor()
             cursor.execute("SHOW TABLES")
             tables = cursor.fetchall()
+            
+            # Count records in diagrams table
+            cursor.execute("SELECT COUNT(*) FROM diagrams")
+            diagram_count = cursor.fetchone()[0]
+            
             cursor.close()
             connection.close()
-            return {"status": "healthy", "database": "connected", "tables_found": len(tables)}
+            return {
+                "status": "healthy", 
+                "database": "connected", 
+                "tables_found": len(tables),
+                "diagram_count": diagram_count
+            }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
+        logger.error(traceback.format_exc())
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 

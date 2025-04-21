@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,7 +10,7 @@ import { toast } from 'sonner';
 import MermaidRenderer from './MermaidRenderer';
 import EntityList from './EntityList';
 import { examples } from '../utils/examples';
-import { Lightbulb, RefreshCcw, AlignJustify, SquareDashedBottom, Database } from 'lucide-react';
+import { Lightbulb, RefreshCcw, AlignJustify, SquareDashedBottom, Database, AlertTriangle } from 'lucide-react';
 import EntityRelationshipEditor from './EntityRelationshipEditor';
 import UMLDefinitionModal from "./UMLDefinitionModal";
 
@@ -36,6 +37,53 @@ const checkUMLValidity = (specs: ProcessSpecsResponse) => {
   return true;
 };
 
+// Mock data to use when API is unavailable
+const createMockResponse = (description: string): ProcessSpecsResponse => {
+  const capitalizeFirstLetter = (string: string) => {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  };
+
+  // Extract potential entity names from the description (this is very simplistic)
+  const words = description.split(/\s+/);
+  const potentialEntities = words
+    .filter(word => word.length > 3 && /^[A-Z]/.test(word))
+    .slice(0, 3)
+    .map(name => capitalizeFirstLetter(name))
+    .filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
+
+  // Ensure we have at least 2 entities, add generic ones if needed
+  if (potentialEntities.length < 2) {
+    potentialEntities.push("Entity1", "Entity2");
+  }
+
+  const entities: Entity[] = potentialEntities.slice(0, 3).map(name => ({
+    name,
+    attributes: [
+      { name: "id", type: "int", visibility: "private" },
+      { name: "name", type: "string", visibility: "public" }
+    ],
+    methods: [
+      { name: "get" + name, returnType: name, parameters: [], visibility: "public" },
+      { name: "update" + name, returnType: "boolean", parameters: [{ name: "data", type: name }], visibility: "public" }
+    ]
+  }));
+
+  const relationships: Relationship[] = [
+    {
+      source: entities[0].name,
+      target: entities[1].name,
+      type: "association",
+      label: "relates to"
+    }
+  ];
+
+  return {
+    enhancedDescription: `This is a mock response for: ${description}\n\nAPI connection appears to be unavailable. Using sample data.`,
+    entities,
+    relationships
+  };
+};
+
 const UMLGenerator: React.FC = () => {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,6 +95,7 @@ const UMLGenerator: React.FC = () => {
   const [lastDiagramId, setLastDiagramId] = useState<number | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [showDefinition, setShowDefinition] = useState(false);
+  const [apiConnectionError, setApiConnectionError] = useState(false);
 
   const [manualEntities, setManualEntities] = useState<Entity[]>([]);
   const [manualRelationships, setManualRelationships] = useState<Relationship[]>([]);
@@ -54,6 +103,52 @@ const UMLGenerator: React.FC = () => {
   const handleExampleClick = (exampleDescription: string) => {
     setDescription(exampleDescription);
     setInputMode('unified');
+  };
+
+  const generateMockUmlSyntax = (specs: ProcessSpecsResponse): string => {
+    let umlCode = 'classDiagram\n';
+    
+    // Add classes with attributes and methods
+    specs.entities.forEach(entity => {
+      umlCode += `class ${entity.name} {\n`;
+      
+      // Add attributes
+      entity.attributes.forEach(attr => {
+        const visibility = attr.visibility === 'private' ? '-' : 
+                          attr.visibility === 'protected' ? '#' : '+';
+        umlCode += `  ${visibility}${attr.name} : ${attr.type}\n`;
+      });
+      
+      // Add methods
+      entity.methods.forEach(method => {
+        const visibility = method.visibility === 'private' ? '-' : 
+                          method.visibility === 'protected' ? '#' : '+';
+        const params = method.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
+        umlCode += `  ${visibility}${method.name}(${params}) ${method.returnType}\n`;
+      });
+      
+      umlCode += '}\n';
+    });
+    
+    // Add relationships
+    specs.relationships.forEach(rel => {
+      let arrow;
+      switch (rel.type) {
+        case 'inheritance': arrow = '<|--'; break;
+        case 'composition': arrow = '*--'; break;
+        case 'aggregation': arrow = 'o--'; break;
+        case 'dependency': arrow = '<..'; break;
+        default: arrow = '-->';
+      }
+      
+      umlCode += `${rel.source} ${arrow} ${rel.target}`;
+      if (rel.label) {
+        umlCode += ` : ${rel.label}`;
+      }
+      umlCode += '\n';
+    });
+    
+    return umlCode;
   };
 
   const handleSubmit = async () => {
@@ -78,11 +173,23 @@ const UMLGenerator: React.FC = () => {
         setLoading(true);
         setProcessingStep("processing");
         const userId = "user-" + Date.now().toString();
-        // Step 1. Process the specifications with LLM
-        const specsResponse = await processSpecs({
-          description,
-          userId: userId,
-        });
+        
+        let specsResponse: ProcessSpecsResponse;
+        
+        try {
+          // Step 1. Process the specifications with LLM
+          specsResponse = await processSpecs({
+            description,
+            userId: userId,
+          });
+        } catch (error) {
+          console.error('API Error in processSpecs:', error);
+          setApiConnectionError(true);
+          // If API fails, use mock data instead
+          toast.error("Unable to connect to the backend API. Using sample data instead.");
+          specsResponse = createMockResponse(description);
+        }
+        
         // New check: ensure specsResponse meets the minimal UML requirements
         const valid = checkUMLValidity(specsResponse);
         if (!valid) {
@@ -97,19 +204,35 @@ const UMLGenerator: React.FC = () => {
 
         // Step 2. Generate the UML diagram
         setProcessingStep("generating");
-        const umlResponse = await generateUML({
-          entities: specsResponse.entities,
-          relationships: specsResponse.relationships,
-          userId: userId,
-        });
-        setUmlSyntax(umlResponse.umlSyntax);
+        let umlResponse;
+        try {
+          umlResponse = await generateUML({
+            entities: specsResponse.entities,
+            relationships: specsResponse.relationships,
+            userId: userId,
+          });
+          setUmlSyntax(umlResponse.umlSyntax);
+        } catch (error) {
+          console.error('Error generating UML:', error);
+          // If API fails, generate mock UML
+          const mockUmlSyntax = generateMockUmlSyntax(specsResponse);
+          setUmlSyntax(mockUmlSyntax);
+          if (!apiConnectionError) {
+            toast.error('API connection failed. Using generated diagram instead.');
+            setApiConnectionError(true);
+          }
+        }
+        
         setProcessingStep("saving");
 
-        toast.success("UML diagram generated and saved to database");
+        toast.success(apiConnectionError ? 
+          "UML diagram generated (in offline mode)" : 
+          "UML diagram generated and saved to database"
+        );
         setActiveTab("diagram");
         setFailedAttempts(0); // Success resets counter
       } catch (error) {
-        console.error('Error generating UML:', error);
+        console.error('Error in UML generation flow:', error);
         toast.error('Failed to generate UML diagram: ' + (error instanceof Error ? error.message : String(error)));
       } finally {
         setLoading(false);
@@ -118,8 +241,18 @@ const UMLGenerator: React.FC = () => {
     } else {
       // For separate input mode, skip the LLM processing
       try {
-        if (manualEntities.length === 0) {
-          toast.error('Please define at least one entity');
+        if (manualEntities.length < 2) {
+          toast.error('Please define at least two entities');
+          return;
+        }
+        
+        if (!manualEntities.every(e => e.attributes?.length > 0 && e.methods?.length > 0)) {
+          toast.error('Each entity must have at least one attribute and one method');
+          return;
+        }
+        
+        if (manualRelationships.length < 1) {
+          toast.error('Please define at least one relationship');
           return;
         }
         
@@ -128,14 +261,27 @@ const UMLGenerator: React.FC = () => {
         
         const userId = "user-" + Date.now().toString();
         
-        // Generate UML directly from manually entered entities and relationships
-        const umlResponse = await generateUML({
-          entities: manualEntities,
-          relationships: manualRelationships,
-          userId: userId
-        });
-        
-        setUmlSyntax(umlResponse.umlSyntax);
+        try {
+          // Generate UML directly from manually entered entities and relationships
+          const umlResponse = await generateUML({
+            entities: manualEntities,
+            relationships: manualRelationships,
+            userId: userId
+          });
+          
+          setUmlSyntax(umlResponse.umlSyntax);
+        } catch (error) {
+          console.error('API Error in generateUML:', error);
+          setApiConnectionError(true);
+          // If API fails, generate mock UML
+          const mockUmlSyntax = generateMockUmlSyntax({
+            enhancedDescription: "Manually defined entities and relationships",
+            entities: manualEntities,
+            relationships: manualRelationships
+          });
+          setUmlSyntax(mockUmlSyntax);
+          toast.error('API connection failed. Using generated diagram instead.');
+        }
         
         // Create a simplified processed specs to show in the structured view
         setProcessedSpecs({
@@ -145,7 +291,10 @@ const UMLGenerator: React.FC = () => {
         });
         
         setProcessingStep('saving');
-        toast.success('UML diagram generated and saved to database');
+        toast.success(apiConnectionError ? 
+          "UML diagram generated (in offline mode)" : 
+          "UML diagram generated and saved to database"
+        );
         setActiveTab('diagram');
       } catch (error) {
         console.error('Error generating UML:', error);
@@ -190,6 +339,15 @@ const UMLGenerator: React.FC = () => {
       <UMLDefinitionModal open={showDefinition} onClose={() => setShowDefinition(false)} />
 
       <div className="container mx-auto py-8 space-y-6">
+        {apiConnectionError && (
+          <div className="flex items-center space-x-2 bg-amber-50 p-4 rounded-md border border-amber-200">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <span className="text-amber-700">
+              Backend API connection unavailable. The application is running in offline mode with sample data.
+            </span>
+          </div>
+        )}
+        
         <Card className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">System Description</h2>

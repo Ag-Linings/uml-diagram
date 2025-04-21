@@ -10,6 +10,7 @@ import datetime
 import time
 import logging
 import traceback
+from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -530,13 +531,34 @@ async def process_specs(request: ProcessSpecsRequest):
         raise HTTPException(status_code=500, detail=f"Error processing specs: {str(e)}")
 
 
+def meets_uml_criteria(entities: list, relationships: list) -> bool:
+    # At least two entities, each entity with at least one attribute, and at least one method
+    if len(entities) < 2:
+        return False
+    for entity in entities:
+        if not entity.attributes or not entity.methods:
+            return False
+    # At least one relationship
+    if len(relationships) < 1:
+        return False
+    return True
+
+
 @app.post("/generate-uml", response_model=GenerateUMLResponse)
 async def generate_uml(request: GenerateUMLRequest):
     try:
         logger.info(f"Generating UML for user {request.userId}")
+        # Validate UML criteria before generation and saving
+        if not meets_uml_criteria(request.entities, request.relationships):
+            logger.warning("UML criteria not met: not enough entities, attributes, methods, or relationships")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "detail": "A UML diagram must have at least two entities, each with at least one attribute and one method, and at least one relationship."
+                }
+            )
+
         uml_syntax = generate_mermaid_uml(request.entities, request.relationships)
-        
-        # Save to database automatically when UML is generated
         try:
             diagram_id = save_uml_data_to_db(
                 userId=request.userId,
@@ -548,7 +570,6 @@ async def generate_uml(request: GenerateUMLRequest):
         except Exception as db_error:
             logger.error(f"Database save failed, but continuing with UML generation: {db_error}")
             logger.error(traceback.format_exc())
-        
         return GenerateUMLResponse(umlSyntax=uml_syntax)
     except Exception as e:
         logger.error(f"Error generating UML: {e}")

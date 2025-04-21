@@ -11,7 +11,10 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://localhost:8000
+      # VITE_API_URL so frontend talks to backend via Docker's service name
+      - VITE_API_URL=http://backend:8000
+    networks:
+      - umlnet
 
   backend:
     build:
@@ -23,9 +26,9 @@ services:
       - mysql
     environment:
       - DB_HOST=mysql
-      - DB_USER=${MYSQL_USER:-root}
-      - DB_PASSWORD=${MYSQL_PASSWORD:-password}
-      - DB_NAME=${MYSQL_DATABASE:-uml_generator}
+      - DB_USER=umluser
+      - DB_PASSWORD=password
+      - DB_NAME=uml_generator
       - DB_PORT=3306
     volumes:
       - ./backend:/app
@@ -35,24 +38,32 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - umlnet
 
   mysql:
     image: mysql:8.0
     ports:
       - "3306:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-uml_generator}
-      - MYSQL_USER=${MYSQL_USER:-umluser}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-password}
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=uml_generator
+      - MYSQL_USER=umluser
+      - MYSQL_PASSWORD=password
     volumes:
       - mysql-data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-password}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - umlnet
 
 volumes:
   mysql-data:
+
+networks:
+  umlnet:
+    driver: bridge

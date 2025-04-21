@@ -25,6 +25,9 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
     setError(null);
 
     if (chart && mermaidRef.current) {
+      // Clean the chart string by removing commas from entity names
+      const cleanedChart = cleanMermaidSyntax(chart);
+      
       const renderChart = async () => {
         try {
           mermaidRef.current!.innerHTML = '';
@@ -32,7 +35,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
           // Generate a unique ID for this render
           const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
           
-          const { svg } = await mermaid.render(id, chart);
+          const { svg } = await mermaid.render(id, cleanedChart);
           
           if (mermaidRef.current) {
             mermaidRef.current.innerHTML = svg;
@@ -51,10 +54,31 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
     }
   }, [chart]);
 
+  // Helper function to clean mermaid syntax
+  const cleanMermaidSyntax = (mermaidCode: string): string => {
+    // Remove commas from class names and relationship definitions
+    let cleanedCode = mermaidCode.replace(/class\s+([^{]+),\s*{/g, 'class $1 {');
+    
+    // Also fix relationship sources and targets with commas
+    const relationRegex = /(\w+),\s+(-+[^>]*>|-+\|>|<\|?-+|o-+|<o-+|-+o|--o)\s+(\w+),/g;
+    cleanedCode = cleanedCode.replace(relationRegex, '$1 $2 $3');
+    
+    // Fix any remaining commas in relationships
+    cleanedCode = cleanedCode.replace(/(\w+),\s+(-+[^>]*>|-+\|>|<\|?-+|o-+|<o-+|-+o|--o)\s+(\w+)/g, '$1 $2 $3');
+    cleanedCode = cleanedCode.replace(/(\w+)\s+(-+[^>]*>|-+\|>|<\|?-+|o-+|<o-+|-+o|--o)\s+(\w+),/g, '$1 $2 $3');
+    
+    return cleanedCode;
+  };
+
   if (error) {
     return (
       <div className="p-4 border border-red-300 rounded bg-red-50 text-red-700">
-        {error}
+        <p className="font-semibold mb-2">Error in diagram syntax:</p>
+        <pre className="whitespace-pre-wrap overflow-x-auto text-sm">{error}</pre>
+        <div className="mt-3 p-2 bg-white rounded border border-red-200">
+          <p className="text-sm">Diagram source (for debugging):</p>
+          <pre className="whitespace-pre-wrap overflow-x-auto text-xs mt-2 p-2 bg-gray-100">{chart}</pre>
+        </div>
       </div>
     );
   }

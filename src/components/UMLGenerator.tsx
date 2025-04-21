@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,7 +36,6 @@ const checkUMLValidity = (specs: ProcessSpecsResponse) => {
   return true;
 };
 
-// Mock data to use when API is unavailable
 const createMockResponse = (description: string): ProcessSpecsResponse => {
   const capitalizeFirstLetter = (string: string) => {
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -48,7 +46,10 @@ const createMockResponse = (description: string): ProcessSpecsResponse => {
   const potentialEntities = words
     .filter(word => word.length > 3 && /^[A-Z]/.test(word))
     .slice(0, 3)
-    .map(name => capitalizeFirstLetter(name))
+    .map(name => {
+      // Remove any trailing commas from the entity name
+      return capitalizeFirstLetter(name.replace(/,+$/, ''));
+    })
     .filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
 
   // Ensure we have at least 2 entities, add generic ones if needed
@@ -110,7 +111,9 @@ const UMLGenerator: React.FC = () => {
     
     // Add classes with attributes and methods
     specs.entities.forEach(entity => {
-      umlCode += `class ${entity.name} {\n`;
+      // Clean entity name (remove commas)
+      const cleanName = entity.name.replace(/,/g, '');
+      umlCode += `class ${cleanName} {\n`;
       
       // Add attributes
       entity.attributes.forEach(attr => {
@@ -123,8 +126,8 @@ const UMLGenerator: React.FC = () => {
       entity.methods.forEach(method => {
         const visibility = method.visibility === 'private' ? '-' : 
                           method.visibility === 'protected' ? '#' : '+';
-        const params = method.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
-        umlCode += `  ${visibility}${method.name}(${params}) ${method.returnType}\n`;
+        const params = method.parameters.map(p => `${p.name}: ${p.type.replace(/,/g, '')}`).join(', ');
+        umlCode += `  ${visibility}${method.name.replace(/,/g, '')}(${params}) ${method.returnType.replace(/,/g, '')}\n`;
       });
       
       umlCode += '}\n';
@@ -132,6 +135,10 @@ const UMLGenerator: React.FC = () => {
     
     // Add relationships
     specs.relationships.forEach(rel => {
+      // Clean source and target names
+      const cleanSource = rel.source.replace(/,/g, '');
+      const cleanTarget = rel.target.replace(/,/g, '');
+      
       let arrow;
       switch (rel.type) {
         case 'inheritance': arrow = '<|--'; break;
@@ -141,7 +148,7 @@ const UMLGenerator: React.FC = () => {
         default: arrow = '-->';
       }
       
-      umlCode += `${rel.source} ${arrow} ${rel.target}`;
+      umlCode += `${cleanSource} ${arrow} ${cleanTarget}`;
       if (rel.label) {
         umlCode += ` : ${rel.label}`;
       }

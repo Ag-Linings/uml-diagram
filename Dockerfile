@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Set the API URL environment variable for the build
-ARG VITE_API_URL=http://backend-service:8000
+ARG VITE_API_URL=http://localhost:8002
 ENV VITE_API_URL=${VITE_API_URL}
 
 COPY . .

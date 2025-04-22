@@ -1,26 +1,33 @@
-# Welcome to your Lovable project
+# UML Diagram generator
 
-## Project info
+A microservice that enables users to generate UML class diagrams from natural language system descriptions or manually defined entities and relationships. It uses a modern frontend stack and a TypeScript backend to provide a seamless and responsive user experience.
 
-**URL**: https://lovable.dev/projects/bb4fab69-601d-4ad0-b6f2-b92bdc306570
+## Features 
+- Natural Language Input for system descriptions to auto-generate UML class diagrams
+- Manual Input Interface for defining custom entities, attributes, methods, and relationships
+- Real-time UML Diagram Generation using Mermaid.js syntax
+- Interactive Diagram Rendering with automatic updates based on user input
+- User-Friendly Design with a responsive UI built for both desktop and mobile devices
 
-## How can I edit this code?
+## Infrastructure
+- Frontend: React, TypeScript, Tailwind CSS
+- Backend: TypeScript, Node.js
+- Diagram Rendering: Mermaid.js
 
-There are several ways of editing your application.
+## Architecture
 
-**Use Lovable**
+### Frontend
+- React Application with TypeScript to build a dynamic and responsive user interface for users to input system descriptions and manually define entities and relationships.
+- Tailwind CSS for efficient and responsive styling, ensuring a clean user interface.
+- Interactive UML Diagram Renderer using Mermaid.js to generate and display UML diagrams in real time.
+- Form for Project Description Input where users can input system descriptions in natural language, which are sent to the backend for processing.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/bb4fab69-601d-4ad0-b6f2-b92bdc306570) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Backend
+- TypeScript for the backend logic, providing APIs to process user input and generate UML diagrams.
+- RESTful API for:
+  - Processing System Descriptions to extract entities, attributes, methods, and relationships from natural language descriptions.
+  - Generating UML Diagrams by converting the processed data into Mermaid.js syntax for rendering on the frontend.
+- Mermaid.js for diagram generation and rendering in the frontend using the extracted and processed data.
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
@@ -36,38 +43,4 @@ npm i
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/bb4fab69-601d-4ad0-b6f2-b92bdc306570) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
